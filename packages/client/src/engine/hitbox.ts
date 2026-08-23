@@ -37,6 +37,8 @@ export interface ActiveHit {
 }
 
 export class Combat {
+  /** 命中回调（卡肉/特效），每次成功命中触发 */
+  onHit?: (owner: Fighter, victim: Fighter) => void;
   private hits: ActiveHit[] = [];
   private nextId = 1;
 
@@ -78,6 +80,7 @@ export class Combat {
         if (rectsOverlap(h.rect, f.getHurtRect())) {
           h.alreadyHit.add(f.id);
           f.takeHit(h.spec, h.owner.getHurtRect().x < f.getHurtRect().x ? 1 : -1);
+          this.onHit?.(h.owner, f);
           h.spec.onHit?.(f);
           if (h.spec.soul) h.owner.gainSoul?.(h.spec.soul);
           if (!h.spec.pierce) h.dead = true;

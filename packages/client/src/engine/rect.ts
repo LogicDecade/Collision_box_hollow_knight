@@ -33,10 +33,14 @@ export function moveAndSlide(
   dt: number,
   solids: readonly Rect[],
 ): MoveResult {
+  // 移动前已与实心重叠 = 出生点嵌入/卡实体。此时不做水平弹飞，
+  // 交由 Y 轴统一向上/向下归位，避免被当作“撞墙”横向甩出。
+  const embeddedBeforeX = vel.x !== 0 && solids.some((s) => rectsOverlap(body, s));
+
   body.x += vel.x * dt;
   let wallLeft = false;
   let wallRight = false;
-  if (vel.x !== 0) {
+  if (vel.x !== 0 && !embeddedBeforeX) {
     for (const s of solids) {
       if (rectsOverlap(body, s)) {
         if (vel.x > 0) {

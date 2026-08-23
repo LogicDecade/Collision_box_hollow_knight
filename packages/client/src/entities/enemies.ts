@@ -15,8 +15,8 @@ interface EnemyStat {
 }
 
 const STATS: Record<EnemyKind, EnemyStat> = {
-  crawler: { hp: 1, w: 24, h: 20, speed: 46, chaseSpeed: 46, chaseRange: 0 },
-  walker: { hp: 3, w: 30, h: 34, speed: 55, chaseSpeed: 125, chaseRange: 280 },
+  crawler: { hp: 3, w: 24, h: 20, speed: 52, chaseSpeed: 52, chaseRange: 0 },
+  walker: { hp: 6, w: 30, h: 34, speed: 55, chaseSpeed: 125, chaseRange: 280 },
 };
 
 let uid = 0;

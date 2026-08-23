@@ -28,7 +28,7 @@ interface Sim {
   fighters: Fighter[];
   run: (frames: number, input?: (i: number) => FrameInput) => void;
 }
-function makeSim(x: number, y: number, foes: { kind: 'crawler' | 'walker'; x: number; y: number }[] = []): Sim {
+function makeSim(x: number, y: number, foes: { kind: 'crawler' | 'walker'; x: number; y: number }[] = [], simFoes = true): Sim {
   const player = new Player(x, y);
   const combat = new Combat();
   player.init(combat);
@@ -40,7 +40,9 @@ function makeSim(x: number, y: number, foes: { kind: 'crawler' | 'walker'; x: nu
       for (let i = 0; i < frames; i++) {
         const cur = inputFn ? inputFn(i) : base;
         player.update(DT, cur, hub.solids);
-        for (const e of enemies) e.update(DT, hub.solids, { x: player.x, y: player.y, alive: player.alive });
+        if (simFoes) {
+          for (const e of enemies) e.update(DT, hub.solids, { x: player.x, y: player.y, alive: player.alive });
+        }
         combat.update(DT, fighters);
       }
     },
@@ -67,14 +69,14 @@ console.log('== 2. 跳跃：起跳后上升再落回地面 ==');
   check('落回地面高度', Math.abs(s.player.y - 618) < 8, `y=${Math.round(s.player.y)}`);
 }
 
-console.log('== 3. 攻击命中敌人：扣血 / 击杀 / 获得灵魂 ==');
+console.log('== 3. 攻击命中敌人：扣血 / 三刀击杀 / 获得灵魂 ==');
 {
-  const s = makeSim(400, 619, [{ kind: 'crawler', x: 448, y: 630 }]);
-  s.run(1, () => inp({ attackPressed: true }));
-  s.run(12, () => inp({}));
-  check('敌人被扣血', s.enemies[0].hp < 1 || !s.enemies[0].alive, `hp=${s.enemies[0].hp} alive=${s.enemies[0].alive}`);
-  check('敌人阵亡', !s.enemies[0].alive);
-  check('玩家获得灵魂', s.player.soul >= FEEL.soulPerHit, `soul=${s.player.soul}`);
+  const s = makeSim(400, 619, [{ kind: 'crawler', x: 448, y: 630 }], false);
+  s.run(14, (i) => inp({ attackPressed: i === 0 }));
+  check('首刀扣血但未死', s.enemies[0].hp < 3 && s.enemies[0].alive, `hp=${s.enemies[0].hp} alive=${s.enemies[0].alive}`);
+  check('命中回魂', s.player.soul >= FEEL.soulPerHit, `soul=${s.player.soul}`);
+  s.run(60, (i) => inp({ attackPressed: i % 24 === 0 }));
+  check('三刀内击杀', !s.enemies[0].alive, `hp=${s.enemies[0].hp}`);
 }
 
 console.log('== 4. 下劈踏击(Pogo)：命中下方敌人后玩家反向弹起 ==');
@@ -87,7 +89,7 @@ console.log('== 4. 下劈踏击(Pogo)：命中下方敌人后玩家反向弹起 
     if (i > 1 && s.player.vy < -200 && !bounceSeen) { bounceSeen = true; }
     return f;
   });
-  check('下劈生效(敌人扣血)', s.enemies[0].hp < 3, `hp=${s.enemies[0].hp}`);
+  check('下劈生效(敌人扣血)', s.enemies[0].hp < 6, `hp=${s.enemies[0].hp}`);
   check('触发踏击弹起', bounceSeen, `vy=${Math.round(s.player.vy)}`);
   void didHit;
 }

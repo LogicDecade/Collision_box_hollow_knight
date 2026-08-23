@@ -32,6 +32,7 @@ export class GameScene extends Phaser.Scene {
   private currentSpawnName = START_SPAWN;
   private transitionCd = 0;
   private healFlashTimer = 0;
+  private hitstopT = 0;
   private saveTimer = 0;
   private loaded = false;
 
@@ -63,6 +64,14 @@ export class GameScene extends Phaser.Scene {
       this.healFlashTimer = 0.5;
     };
     this.player.onHurt = () => this.cameras.main.shake(140, 0.004);
+
+    // 卡肉：玩家命中敌人时短暂冻结世界 + 轻微抖动
+    this.combat.onHit = (owner) => {
+      if (owner.team === 'player') {
+        this.hitstopT = 0.07;
+        this.cameras.main.shake(60, 0.0025);
+      }
+    };
 
     this.fadeRect = this.add
       .rectangle(0, 0, WORLD_W, WORLD_H, 0x000000, 1)
@@ -123,6 +132,7 @@ export class GameScene extends Phaser.Scene {
     this.player.invulnT = 0.8;
 
     this.enemies = this.room.enemies.map((e) => new Enemy(e.kind, e.x, e.y));
+    this.enemies.forEach((e) => this.settleEnemy(e));
 
     this.rebuildRoomLayer();
     this.rebuildEntityVisuals();
@@ -132,6 +142,17 @@ export class GameScene extends Phaser.Scene {
     this.followTarget.y = this.player.y;
     this.roomLabel.setText(this.room.name);
     this.transitionCd = 0.6;
+  }
+
+  /** 敌人出生点自动落到覆盖其横向跨度的最近地面（防初始嵌入后被碰撞轴向弹飞） */
+  private settleEnemy(e: Enemy): void {
+    const half = e.w / 2;
+    const topY = e.y - e.h / 2;
+    const below = this.room.solids
+      .filter((s) => e.x + half > s.x && e.x - half < s.x + s.w)
+      .filter((s) => s.y >= topY)
+      .sort((a, b) => a.y - b.y)[0];
+    if (below) e.y = below.y - e.h / 2 - 0.5;
   }
 
   private rebuildRoomLayer(): void {
@@ -267,6 +288,14 @@ export class GameScene extends Phaser.Scene {
 
     const inp = this.inputManager.update();
     if (inp.pausePressed) this.openPause();
+
+    // 卡肉（hitstop）：世界冻结，只渲染不推进
+    if (this.hitstopT > 0) {
+      this.hitstopT -= dt;
+      this.drawHud();
+      this.renderAll(dt);
+      return;
+    }
 
     if (!this.player.alive) {
       // 死亡流程已在 handleDeath 中处理，这里只维持渲染

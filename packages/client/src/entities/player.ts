@@ -234,26 +234,20 @@ export class Player implements Fighter {
         if (this.vy > 0) g *= FEEL.fallGravityMult;
         this.vy = Math.min(FEEL.maxFall, this.vy + g * dt);
       }
-      // 命中窗内更新 hitbox 位置
+      // 命中窗内更新 hitbox 位置；窗口结束立刻移除（避免碰撞箱滞留在原地）
       if (this.activeHit && this.stateT < FEEL.attackHitWindow) {
         this.activeHit.rect = this.rectMove(this.activeHit.rect);
+      } else if (this.activeHit) {
+        this.combat?.remove(this.activeHit);
+        this.activeHit = null;
       }
       if (this.stateT >= FEEL.attackDur) {
-        if (this.activeHit) {
-          this.combat?.remove(this.activeHit);
-          this.activeHit = null;
-        }
         this.setState(this.onGround ? 'idle' : 'fall');
       }
-    } else if (this.state === 'hurt' || this.state === 'wallslide') {
+    } else if (this.state === 'hurt') {
       // 受击：只有重力 + 击退速度衰减
-      if (this.state === 'hurt') {
-        this.vy = Math.min(FEEL.maxFall, this.vy + FEEL.gravity * dt);
-        if (this.onGround && this.stateT > 0.2) this.setState('idle');
-        if (this.invulnT > 0) {
-          // 击退水平速度朝反方向短暂持续
-        }
-      }
+      this.vy = Math.min(FEEL.maxFall, this.vy + FEEL.gravity * dt);
+      if (this.onGround && this.stateT > 0.2) this.setState('idle');
     } else if (this.canAct()) {
       // ---- 常规移动态 ----
       // 贴墙检测
