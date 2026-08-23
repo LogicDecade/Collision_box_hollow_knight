@@ -7,7 +7,7 @@ import { Combat, Fighter } from '../engine/hitbox';
 import { rectsOverlap } from '../engine/rect';
 import { Player } from '../entities/player';
 import { Enemy } from '../entities/enemies';
-import { ROOMS, RoomDef, START_ROOM, START_SPAWN } from '../world/rooms';
+import { ROOMS, RoomDef, roomLiveEnemies, START_ROOM, START_SPAWN } from '../world/rooms';
 import { loadSave, saveSave } from '../engine/save';
 import { showPause, hidePause } from '../ui/pause';
 
@@ -35,6 +35,9 @@ export class GameScene extends Phaser.Scene {
   private hitstopT = 0;
   private saveTimer = 0;
   private loaded = false;
+  /** 已击杀敌人 key（房间id:定义索引）→ 存档持久化，重进房间不复活 */
+  private killedEnemies = new Set<string>();
+  private enemyDefIndex = new Map<Enemy, number>();
 
   private roomLayer!: Phaser.GameObjects.Container;
   private entityLayer!: Phaser.GameObjects.Container;
@@ -91,13 +94,14 @@ export class GameScene extends Phaser.Scene {
 
     this.buildHud();
 
-    // 读本地存档决定初始位置
+    // 读本地存档决定初始位置与击杀记录
     const save = loadSave();
     const startRoom = save && ROOMS[save.room] ? save.room : START_ROOM;
     const startSpawn = save && ROOMS[save.room] ? save.spawn : START_SPAWN;
     if (save) {
       this.player.hp = save.hp;
       this.player.soul = save.soul;
+      this.killedEnemies = new Set(save.killed ?? []);
     }
     this.loadRoom(startRoom, startSpawn);
     this.loaded = true;
@@ -131,7 +135,15 @@ export class GameScene extends Phaser.Scene {
     this.player.vy = 0;
     this.player.invulnT = 0.8;
 
-    this.enemies = this.room.enemies.map((e) => new Enemy(e.kind, e.x, e.y));
+    // 按击杀记录生成存活敌人（击杀的在本房间不再出现）
+    const liveRefs = roomLiveEnemies(this.roomId, this.room.enemies, this.killedEnemies);
+    this.enemies = [];
+    this.enemyDefIndex.clear();
+    for (const ref of liveRefs) {
+      const e = new Enemy(ref.def.kind, ref.def.x, ref.def.y);
+      this.enemyDefIndex.set(e, ref.idx);
+      this.enemies.push(e);
+    }
     this.enemies.forEach((e) => this.settleEnemy(e));
 
     this.rebuildRoomLayer();
@@ -260,6 +272,7 @@ export class GameScene extends Phaser.Scene {
       soul: this.player.soul,
       room: this.roomId,
       spawn: this.currentSpawnName,
+      killed: [...this.killedEnemies],
     });
   }
 
@@ -316,6 +329,20 @@ export class GameScene extends Phaser.Scene {
     // 战斗结算
     const fighters: Fighter[] = [this.player, ...this.enemies];
     this.combat.update(dt, fighters);
+
+    // 敌人死亡 → 写入击杀记录（跨房间往返不再复活）
+    for (const e of this.enemies) {
+      if (!e.alive) {
+        const idx = this.enemyDefIndex.get(e);
+        if (idx !== undefined) {
+          const key = `${this.roomId}:${idx}`;
+          if (!this.killedEnemies.has(key)) {
+            this.killedEnemies.add(key);
+            this.save();
+          }
+        }
+      }
+    }
 
     // 敌人接触伤害
     if (this.player.invulnT <= 0) {

@@ -268,11 +268,14 @@ export class Player implements Fighter {
         if (solids.some((s) => rectsOverlap(front, s))) this.wallDir = input.lx;
       }
 
-      // 重力
+      // 重力（上升段：按住=正常升满，松开=重力加大切短跳跃；下降段加重）
       if (!this.onGround) {
         let g = FEEL.gravity;
-        if (this.vy < 0 && !input.jumpHeld) g *= FEEL.jumpCutMult;
-        else if (this.vy > 0) g *= FEEL.fallGravityMult;
+        if (this.vy < 0) {
+          if (!input.jumpHeld) g *= FEEL.jumpCutMult;
+        } else if (this.vy > 0) {
+          g *= FEEL.fallGravityMult;
+        }
         this.vy = Math.min(FEEL.maxFall, this.vy + g * dt);
       }
 
@@ -338,6 +341,8 @@ export class Player implements Fighter {
     // ---- 整合碰撞位移 ----
     const body = this.rect();
     const res = moveAndSlide(body, { x: this.vx, y: this.vy }, dt, solids);
+    // 顶到天花板立即停止上升，避免被反复下压造成“悬浮”
+    if (res.ceiling) this.vy = 0;
     this.x = body.x + this.w / 2;
     this.y = body.y + this.h / 2;
     const wasGrounded = this.onGround;

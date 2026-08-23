@@ -107,3 +107,23 @@ const arena: RoomDef = {
 export const ROOMS: Record<string, RoomDef> = { hub, corridor, arena };
 export const START_ROOM = 'hub';
 export const START_SPAWN = 'enter';
+
+/** 已被击杀的敌人其定义索引 */
+export interface SpawnedEnemyRef {
+  def: EnemyDef;
+  /** 在 room.enemies 中的原始索引（持久化 key 的稳定标识） */
+  idx: number;
+}
+
+/** 依据击杀记录筛选仍然存活的敌人定义（跨房间往返不复活） */
+export function roomLiveEnemies(
+  roomId: string,
+  defs: readonly EnemyDef[],
+  killed: ReadonlySet<string>,
+): SpawnedEnemyRef[] {
+  const out: SpawnedEnemyRef[] = [];
+  defs.forEach((def, i) => {
+    if (!killed.has(`${roomId}:${i}`)) out.push({ def, idx: i });
+  });
+  return out;
+}

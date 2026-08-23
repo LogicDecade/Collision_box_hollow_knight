@@ -5,7 +5,7 @@ import { Player } from '../packages/client/src/entities/player';
 import { Enemy } from '../packages/client/src/entities/enemies';
 import { Combat, Fighter } from '../packages/client/src/engine/hitbox';
 import { FEEL } from '../packages/client/src/engine/feel';
-import { ROOMS } from '../packages/client/src/world/rooms';
+import { ROOMS, roomLiveEnemies } from '../packages/client/src/world/rooms';
 import { rectsOverlap } from '../packages/client/src/engine/rect';
 import type { FrameInput } from '../packages/client/src/engine/input';
 
@@ -146,6 +146,57 @@ console.log('== 8. 追击遇崖：walker 追坑对面玩家应停在崖边不掉
     w.x >= 700 - 12 && w.y > 500,
     `x=${w.x.toFixed(1)} y=${w.y.toFixed(1)}`,
   );
+}
+
+console.log('== 9. 可变跳高：按住跳得更高，快速松键跳得低 ==');
+{
+  const measure = (hold: boolean) => {
+    const s = makeSim(260, 619);
+    let minY = 619;
+    s.run(1, () => inp({ jumpPressed: true, jumpHeld: hold }));
+    s.run(110, () => {
+      minY = Math.min(minY, s.player.y);
+      return inp({ jumpHeld: hold });
+    });
+    return minY;
+  };
+  const hold = measure(true);
+  const tap = measure(false);
+  check('按住跳更高', hold < tap - 20, `hold=${Math.round(hold)} tap=${Math.round(tap)}`);
+}
+
+console.log('== 10. 顶到平台底部：立即停止上升回落，不悬浮 ==');
+{
+  // hub 平台A(380,490,300x22)，玩家在其正下方地面起跳 → 头顶到达平台底(512)
+  const s = makeSim(500, 619);
+  let contactSeen = false;
+  let hover = 0;
+  s.run(1, () => inp({ jumpPressed: true }));
+  s.run(90, (i) => {
+    const f = inp({ jumpHeld: true });
+    const ft = s.player.y - 21; // 头顶
+    if (ft <= 512.5) contactSeen = true;
+    if (contactSeen && s.player.y >= 525 && s.player.y <= 545) hover++;
+    return f;
+  });
+  const finalY = s.player.y;
+  check('确实顶到平台底', contactSeen);
+  check('未悬浮(平台底区域逗留<20帧)', hover < 20, `hover=${hover}`);
+  check('顶撞后正常回落', finalY > 580, `finalY=${Math.round(finalY)}`);
+}
+
+console.log('== 11. 击杀持久化：已击杀的敌人定义不再重生 ==');
+{
+  const cor = ROOMS.corridor;
+  const killed = new Set(['corridor:0']); // 杀掉 crawler(索引0)
+  const live = roomLiveEnemies('corridor', cor.enemies, killed);
+  check(
+    '存活1只且为walker(索引1)',
+    live.length === 1 && live[0].idx === 1 && live[0].def.kind === 'walker',
+    `n=${live.length}`,
+  );
+  const all = roomLiveEnemies('corridor', cor.enemies, new Set());
+  check('无击杀记录时仍是2只', all.length === 2, `n=${all.length}`);
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

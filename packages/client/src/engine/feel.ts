@@ -13,7 +13,8 @@ export const FEEL = {
   // 跳跃（y 向下为正，起跳为负速度）
   gravity: 1900,
   jumpVel: 600,
-  jumpCutMult: 0.48,
+  /** 上升段重力倍率：按住=1(升满)，松开>1(切短跳跃) */
+  jumpCutMult: 2.2,
   fallGravityMult: 1.28,
   maxFall: 660,
   coyote: 0.1,
