@@ -28,7 +28,13 @@ interface Sim {
   fighters: Fighter[];
   run: (frames: number, input?: (i: number) => FrameInput) => void;
 }
-function makeSim(x: number, y: number, foes: { kind: 'crawler' | 'walker'; x: number; y: number }[] = [], simFoes = true): Sim {
+function makeSim(
+  x: number,
+  y: number,
+  foes: { kind: 'crawler' | 'walker'; x: number; y: number }[] = [],
+  simFoes = true,
+  solids: readonly { x: number; y: number; w: number; h: number }[] = hub.solids,
+): Sim {
   const player = new Player(x, y);
   const combat = new Combat();
   player.init(combat);
@@ -39,9 +45,9 @@ function makeSim(x: number, y: number, foes: { kind: 'crawler' | 'walker'; x: nu
     run(frames, inputFn) {
       for (let i = 0; i < frames; i++) {
         const cur = inputFn ? inputFn(i) : base;
-        player.update(DT, cur, hub.solids);
+        player.update(DT, cur, solids);
         if (simFoes) {
-          for (const e of enemies) e.update(DT, hub.solids, { x: player.x, y: player.y, alive: player.alive });
+          for (const e of enemies) e.update(DT, solids, { x: player.x, y: player.y, alive: player.alive });
         }
         combat.update(DT, fighters);
       }
@@ -79,19 +85,20 @@ console.log('== 3. 攻击命中敌人：扣血 / 三刀击杀 / 获得灵魂 =='
   check('三刀内击杀', !s.enemies[0].alive, `hp=${s.enemies[0].hp}`);
 }
 
-console.log('== 4. 下劈踏击(Pogo)：命中下方敌人后玩家反向弹起 ==');
+console.log('== 4. 下劈踏击(Pogo)：命中下方敌人后玩家反向弹起，判定框全程可见 ==');
 {
   const s = makeSim(300, 560, [{ kind: 'walker', x: 304, y: 623 }]); // 玩家在空中，敌人在地面
   let bounceSeen = false;
-  let didHit = false;
+  let boxFrames = 0;
   s.run(20, (i) => {
     const f = inp({ ly: 1, attackPressed: i === 1 });
+    if (s.player.swingBox) boxFrames++;
     if (i > 1 && s.player.vy < -200 && !bounceSeen) { bounceSeen = true; }
     return f;
   });
   check('下劈生效(敌人扣血)', s.enemies[0].hp < 6, `hp=${s.enemies[0].hp}`);
   check('触发踏击弹起', bounceSeen, `vy=${Math.round(s.player.vy)}`);
-  void didHit;
+  check('下劈判定框可见≥4帧(不瞬消)', boxFrames >= 4, `boxFrames=${boxFrames}`);
 }
 
 console.log('== 5. 灵魂回血：消耗 33 灵魂，蓄力完成后 +1 HP ==');
@@ -124,6 +131,21 @@ console.log('== 7. 死亡与重生：归零 → onDeath → respawn 回满 ==');
   died = false;
   s.player.respawn(260, 619);
   check('复活回满', s.player.alive && s.player.hp === FEEL.maxHp && !died, `alive=${s.player.alive} hp=${s.player.hp}`);
+}
+
+console.log('== 8. 追击遇崖：walker 追坑对面玩家应停在崖边不掉落 ==');
+{
+  const cor = ROOMS.corridor;
+  // 玩家在坑左侧地面段，walker 在坑右侧地面段追击 → 冲到 x≈700 崖边应停下
+  const s = makeSim(500, 538, [{ kind: 'walker', x: 760, y: 548 }], true, cor.solids);
+  s.run(240, () => inp({ lx: 0 }));
+  const w = s.enemies[0];
+  check('walker 未掉入坑', w.alive && w.y < cor.h, `x=${w.x.toFixed(1)} y=${w.y.toFixed(1)}`);
+  check(
+    'walker 停在崖边(不越过坑边)',
+    w.x >= 700 - 12 && w.y > 500,
+    `x=${w.x.toFixed(1)} y=${w.y.toFixed(1)}`,
+  );
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

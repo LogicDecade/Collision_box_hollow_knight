@@ -143,6 +143,26 @@ export class Player implements Fighter {
     );
   }
 
+  /** 攻击几何：按状态给出判定盒大小与相对玩家的偏移 */
+  private attackGeometry(state: PlayerState): { box: BoxShape; ox: number; oy: number } {
+    if (state === 'upattack') {
+      return { box: FEEL.upSlashBox, ox: 0, oy: FEEL.upSlashOffsetY };
+    }
+    if (state === 'downattack') {
+      return { box: FEEL.downSlashBox, ox: 0, oy: FEEL.downSlashOffsetY };
+    }
+    return { box: FEEL.attackBox, ox: this.facing * FEEL.attackOffsetX, oy: 0 };
+  }
+
+  /** 可见挥击框：整段攻击动画期间跟随玩家（伤害判定仍由 Combat 的 ttl 命中窗控制） */
+  get swingBox(): Rect | null {
+    if (this.state !== 'attack' && this.state !== 'upattack' && this.state !== 'downattack') {
+      return null;
+    }
+    const { box, ox, oy } = this.attackGeometry(this.state);
+    return { x: this.x + ox - box.w / 2, y: this.y + oy - box.h / 2, w: box.w, h: box.h };
+  }
+
   private startAttack(kind: 'attack' | 'upattack' | 'downattack'): void {
     this.combat?.clearOwner(this);
     this.setState(kind);
@@ -151,20 +171,10 @@ export class Player implements Fighter {
     if (kind === 'upattack') {
       this.vy = -FEEL.upSlashHop;
     }
-    let box: BoxShape;
-    let offset = { x: this.facing * FEEL.attackOffsetX, y: 0 };
-    if (kind === 'upattack') {
-      box = FEEL.upSlashBox;
-      offset = { x: 0, y: FEEL.upSlashOffsetY };
-    } else if (kind === 'downattack') {
-      box = FEEL.downSlashBox;
-      offset = { x: 0, y: FEEL.downSlashOffsetY };
-    } else {
-      box = FEEL.attackBox;
-    }
+    const { box, ox, oy } = this.attackGeometry(kind);
     const hitRect: Rect = {
-      x: this.x + offset.x - box.w / 2,
-      y: this.y + offset.y - box.h / 2,
+      x: this.x + ox - box.w / 2,
+      y: this.y + oy - box.h / 2,
       w: box.w,
       h: box.h,
     };
@@ -178,15 +188,11 @@ export class Player implements Fighter {
     this.activeHit = this.combat?.add(this, hitRect, spec, FEEL.attackHitWindow) ?? null;
   }
 
-  /** 下劈踏击：命中敌人瞬间向上弹跳 */
+  /** 下劈踏击：命中敌人瞬间向上弹跳；保持 downattack，命中框继续跟随挥击 */
   private pogo(): void {
     if (this.state !== 'downattack') return;
-    if (this.activeHit) {
-      this.combat?.remove(this.activeHit);
-      this.activeHit = null;
-    }
     this.vy = -FEEL.pogoBounce;
-    this.setState('fall');
+    // 不主动销毁命中框：挥击窗口内仍可命中其它敌人（多怪连踏）
   }
 
   update(dt: number, input: FrameInput, solids: readonly Rect[]): void {
@@ -234,9 +240,9 @@ export class Player implements Fighter {
         if (this.vy > 0) g *= FEEL.fallGravityMult;
         this.vy = Math.min(FEEL.maxFall, this.vy + g * dt);
       }
-      // 命中窗内更新 hitbox 位置；窗口结束立刻移除（避免碰撞箱滞留在原地）
+      // 命中窗内更新 hitbox 位置；窗口结束移除（伤害判定不再延续）
       if (this.activeHit && this.stateT < FEEL.attackHitWindow) {
-        this.activeHit.rect = this.rectMove(this.activeHit.rect);
+        this.activeHit.rect = this.rectMove();
       } else if (this.activeHit) {
         this.combat?.remove(this.activeHit);
         this.activeHit = null;
@@ -345,24 +351,11 @@ export class Player implements Fighter {
   }
 
   /** 依据当前攻击状态计算命中盒新位置（中心跟随玩家） */
-  private rectMove(base: Rect): Rect {
-    let box: BoxShape;
-    let offsetX = this.facing * FEEL.attackOffsetX;
-    let offsetY = 0;
-    if (this.state === 'upattack') {
-      box = FEEL.upSlashBox;
-      offsetX = 0;
-      offsetY = FEEL.upSlashOffsetY;
-    } else if (this.state === 'downattack') {
-      box = FEEL.downSlashBox;
-      offsetX = 0;
-      offsetY = FEEL.downSlashOffsetY;
-    } else {
-      box = FEEL.attackBox;
-    }
+  private rectMove(): Rect {
+    const { box, ox, oy } = this.attackGeometry(this.state);
     return {
-      x: this.x + offsetX - box.w / 2,
-      y: this.y + offsetY - box.h / 2,
+      x: this.x + ox - box.w / 2,
+      y: this.y + oy - box.h / 2,
       w: box.w,
       h: box.h,
     };

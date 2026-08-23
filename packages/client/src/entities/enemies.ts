@@ -95,12 +95,25 @@ export class Enemy implements Fighter {
     } else {
       // 决定朝向与速度
       const dx = player ? player.x - this.x : 0;
-      const chase = player && player.alive && this.stat.chaseRange > 0 && Math.abs(dx) < this.stat.chaseRange;
+      const chase =
+        player && player.alive && this.stat.chaseRange > 0 && Math.abs(dx) < this.stat.chaseRange && dx !== 0;
       this.state = chase ? 'chase' : 'wander';
       const speed = this.state === 'chase' ? this.stat.chaseSpeed : this.stat.speed;
-      const wantDir = dx && chase ? Math.sign(dx) : this.dir;
+
+      // 基础期望方向：巡逻沿旧方向；追击朝向玩家
+      let wantDir = chase ? Math.sign(dx) : this.dir;
+
+      // 前方无地面（悬崖）：追击则停下不跳崖，巡逻则换向
+      if (this.onGround && !this.probeGroundAhead(wantDir, solids)) {
+        if (chase) {
+          wantDir = 0;
+        } else {
+          wantDir = this.dir * -1;
+        }
+      }
+
       if (wantDir !== 0) this.dir = wantDir;
-      this.vx = this.dir * speed;
+      this.vx = wantDir * speed;
     }
 
     if (this.knockT > 0) {
@@ -112,7 +125,10 @@ export class Enemy implements Fighter {
     const res = moveAndSlide(body, { x: this.vx, y: this.vy }, dt, solids);
     this.x = body.x + this.w / 2;
     this.y = body.y + this.h / 2;
-    this.onGround = res.ground;
+    // 接地判定要稳：恰好齐平地板时 moveAndSlide 探测不到重叠，
+    // 若只用 res.ground 会逐帧抖动，导致悬崖守卫间歇失效。用脚下探针兜底。
+    this.onGround = res.ground || this.probeGroundNow(solids, body);
+    if (this.onGround) this.vy = 0;
 
     // 巡逻换向：撞墙 或 前方悬空（可能是坑）
     if (!this.knockT) {
@@ -125,6 +141,21 @@ export class Enemy implements Fighter {
         this.dir *= -1;
       }
     }
+  }
+
+  /** 脚下是否有地面（紧贴地面时稳定判定） */
+  private probeGroundNow(solids: readonly Rect[], body?: Rect): boolean {
+    const b = body ?? this.rect();
+    const probe: Rect = { x: b.x + 1, y: b.y + b.h + 1, w: Math.max(2, b.w - 2), h: 3 };
+    return solids.some((s) => rectsOverlap(probe, s));
+  }
+
+  /** 朝 dir 方向前方是否有地面（探脚点），用于悬崖判断 */
+  private probeGroundAhead(dir: number, solids: readonly Rect[]): boolean {
+    if (dir === 0) return true; // 未定方向视为安全
+    const gx = dir > 0 ? this.x + this.w / 2 + 6 : this.x - this.w / 2 - 6;
+    const probe: Rect = { x: gx - 2, y: this.y + this.h / 2 + 6, w: 4, h: 3 };
+    return solids.some((s) => rectsOverlap(probe, s));
   }
 
   /** 是否撞到玩家（供场景做接触伤害） */

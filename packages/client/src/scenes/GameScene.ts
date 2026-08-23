@@ -388,10 +388,10 @@ export class GameScene extends Phaser.Scene {
       v.body.setFillStyle(e.flashT > 0 ? COLORS.hurt : COLORS.enemy, 1);
     }
 
-    // 攻击判定框（debug 视觉）
-    const hb = this.player.activeHitRect;
-    if (hb) {
-      this.hitDebug.setPosition(hb.x + hb.w / 2, hb.y + hb.h / 2).setSize(hb.w, hb.h).setVisible(true);
+    // 攻击判定框（debug 视觉）：整段挥击期间可见、随玩家移动
+    const sb = this.player.swingBox;
+    if (sb) {
+      this.hitDebug.setPosition(sb.x + sb.w / 2, sb.y + sb.h / 2).setSize(sb.w, sb.h).setVisible(true);
     } else {
       this.hitDebug.setVisible(false);
     }
