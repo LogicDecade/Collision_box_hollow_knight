@@ -1,0 +1,17 @@
+{
+  "name": "collision-box-hollow-knight",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev:client": "npm run dev -w client",
+    "dev:server": "npm run dev -w server",
+    "build:client": "npm run build -w client",
+    "build:all": "npm run build -w client",
+    "start:server": "SERVER=prod npm run dev -w server",
+    "test": "tsx tools/smoke.ts",
+    "typecheck": "tsc -p packages/client/tsconfig.json --noEmit && tsc -p packages/server/tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

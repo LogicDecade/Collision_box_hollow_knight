@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+data/game.db
+data/game.db-journal
+data/game.db-wal
+data/game.db-shm
+.env
