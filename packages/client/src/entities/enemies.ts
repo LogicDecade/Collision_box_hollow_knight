@@ -37,6 +37,10 @@ export class Enemy implements Fighter {
   private knockT = 0;
   private stat: EnemyStat;
   private state: 'wander' | 'chase' = 'wander';
+  /** 上一帧撞到的墙方向（-1 左墙 / 1 右墙 / 0 无），供追击贴墙判定 */
+  private wallHitDir = 0;
+  /** 追击被挡住后的暂停时长：剩余秒数内转为巡逻（够不到就放弃追击） */
+  private chaseHaltT = 0;
 
   constructor(kind: EnemyKind, x: number, y: number) {
     this.id = `e${uid++}`;
@@ -82,6 +86,7 @@ export class Enemy implements Fighter {
   ): void {
     if (!this.alive) return;
     if (this.flashT > 0) this.flashT -= dt;
+    if (this.chaseHaltT > 0) this.chaseHaltT -= dt;
 
     // 重力
     if (!this.onGround) {
@@ -96,20 +101,26 @@ export class Enemy implements Fighter {
       // 决定朝向与速度
       const dx = player ? player.x - this.x : 0;
       const chase =
-        player && player.alive && this.stat.chaseRange > 0 && Math.abs(dx) < this.stat.chaseRange && dx !== 0;
+        player &&
+        player.alive &&
+        this.stat.chaseRange > 0 &&
+        Math.abs(dx) < this.stat.chaseRange &&
+        dx !== 0 &&
+        this.chaseHaltT <= 0;
       this.state = chase ? 'chase' : 'wander';
       const speed = this.state === 'chase' ? this.stat.chaseSpeed : this.stat.speed;
 
       // 基础期望方向：巡逻沿旧方向；追击朝向玩家
       let wantDir = chase ? Math.sign(dx) : this.dir;
 
-      // 前方无地面（悬崖）：追击则停下不跳崖，巡逻则换向
       if (this.onGround && !this.probeGroundAhead(wantDir, solids)) {
-        if (chase) {
-          wantDir = 0;
-        } else {
-          wantDir = this.dir * -1;
-        }
+        // 前方无地面（悬崖）：追击暂停 0.6s 并转身巡逻，不跳崖
+        this.chaseHaltT = Math.max(this.chaseHaltT, 0.6);
+        wantDir = this.dir * -1;
+      } else if (chase && wantDir === this.wallHitDir) {
+        // 追击方向刚撞过墙：放弃追击，暂停后转身走开（防卡在门边）
+        this.chaseHaltT = Math.max(this.chaseHaltT, 0.6);
+        wantDir = this.dir * -1;
       }
 
       if (wantDir !== 0) this.dir = wantDir;
@@ -141,6 +152,7 @@ export class Enemy implements Fighter {
         this.dir *= -1;
       }
     }
+    this.wallHitDir = res.wallLeft ? -1 : res.wallRight ? 1 : 0;
   }
 
   /** 脚下是否有地面（紧贴地面时稳定判定） */

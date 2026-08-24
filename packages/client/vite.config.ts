@@ -1,4 +1,7 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
+
+const rp = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
   server: {
@@ -13,5 +16,11 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      input: {
+        main: rp('index.html'),
+        editor: rp('editor.html'),
+      },
+    },
   },
 });

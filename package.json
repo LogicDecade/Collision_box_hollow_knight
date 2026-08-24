@@ -3,6 +3,7 @@
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {
+    "dev": "node tools/dev.mjs",
     "dev:client": "npm run dev -w client",
     "dev:server": "npm run dev -w server",
     "build:client": "npm run build -w client",

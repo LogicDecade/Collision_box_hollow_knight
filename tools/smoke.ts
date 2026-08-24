@@ -6,6 +6,7 @@ import { Enemy } from '../packages/client/src/entities/enemies';
 import { Combat, Fighter } from '../packages/client/src/engine/hitbox';
 import { FEEL } from '../packages/client/src/engine/feel';
 import { ROOMS, roomLiveEnemies } from '../packages/client/src/world/rooms';
+import { parseRoom, roomToJSON, roomToTS, snapRect } from '../packages/client/src/editor/roomData';
 import { rectsOverlap } from '../packages/client/src/engine/rect';
 import type { FrameInput } from '../packages/client/src/engine/input';
 
@@ -197,6 +198,40 @@ console.log('== 11. 击杀持久化：已击杀的敌人定义不再重生 ==');
   );
   const all = roomLiveEnemies('corridor', cor.enemies, new Set());
   check('无击杀记录时仍是2只', all.length === 2, `n=${all.length}`);
+}
+
+console.log('== 12. 追击撞墙：walker 追到走廊左门处应放弃追击转身巡逻，不卡死 ==');
+{
+  const cor = ROOMS.corridor;
+  // 玩家贴左墙，walker 在右侧追击 → 撞到左墙(x40)后应暂停追击并走开
+  const s = makeSim(90, 538, [{ kind: 'walker', x: 300, y: 548 }], true, cor.solids);
+  s.run(60, () => inp({ lx: 0 }));
+  let minX = Infinity;
+  let maxX = -Infinity;
+  s.run(180, () => {
+    minX = Math.min(minX, s.enemies[0].x);
+    maxX = Math.max(maxX, s.enemies[0].x);
+    return inp({ lx: 0 });
+  });
+  const w = s.enemies[0];
+  check('未穿墙', minX >= 34, `minX=${minX.toFixed(1)}`);
+  check('未永久卡在左门(后续有巡逻移动)', maxX > 120, `maxX=${maxX.toFixed(1)} x=${w.x.toFixed(1)}`);
+}
+
+console.log('== 13. 编辑器数据层：TS/JSON 导出→解析往返一致 + 网格吸附 ==');
+{
+  const hub = ROOMS.hub;
+  const same = (a: unknown) => JSON.stringify(a) === JSON.stringify(hub);
+  const fromTS = parseRoom(roomToTS(hub));
+  const fromJSON = parseRoom(roomToJSON(hub));
+  check('TS 片段可解析回原房间', !!fromTS && same(fromTS), fromTS ? '不一致' : '解析失败');
+  check('JSON 可解析回原房间', !!fromJSON && same(fromJSON), fromJSON ? '不一致' : '解析失败');
+  const r = snapRect(13, 27, 33, 41);
+  check(
+    '网格吸附(24格)',
+    r.x === 24 && r.y === 24 && r.w === 24 && r.h === 48,
+    `${r.x},${r.y},${r.w},${r.h}`,
+  );
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
