@@ -40,17 +40,27 @@ const hub: RoomDef = {
     { x: 0, y: 640, w: 1600, h: 120 }, // 地板
     { x: 0, y: 0, w: 40, h: 640 }, // 左墙
     { x: 1560, y: 0, w: 40, h: 640 }, // 右墙
-    { x: 380, y: 490, w: 300, h: 22 }, // 平台 A
-    { x: 860, y: 460, w: 240, h: 22 }, // 平台 B
+    { x: 240, y: 456, w: 340, h: 24 }, // 平台 A（编辑器中改动）
+    { x: 648, y: 360, w: 144, h: 24 }, // 平台 B（编辑器中改动）
     { x: 1220, y: 390, w: 220, h: 22 }, // 平台 C
     { x: 130, y: 560, w: 60, h: 80 }, // 装饰立柱
+    { x: 840, y: 264, w: 264, h: 24 }, // 平台 D（编辑器中新增）
+    { x: 1152, y: 168, w: 408, h: 24 }, // 高台（编辑器中新增）
   ],
   spawns: [
     { name: 'enter', x: 260, y: 618 },
     { name: 'fromCorridor', x: 1500, y: 618 },
   ],
-  transitions: [{ rect: { x: 1540, y: 480, w: 60, h: 160 }, to: 'corridor', spawn: 'fromHub' }],
-  enemies: [{ kind: 'crawler', x: 520, y: 628 }],
+  transitions: [
+    { rect: { x: 1540, y: 480, w: 60, h: 160 }, to: 'corridor', spawn: 'fromHub' },
+    // ⚠️ 编辑器里放的自循环过渡(本房间→本房间出生点)，先保留，无须可删
+    { rect: { x: 1548, y: 87, w: 48, h: 96 }, to: 'hub', spawn: 'enter' },
+  ],
+  enemies: [
+    { kind: 'crawler', x: 520, y: 628 },
+    { kind: 'crawler', x: 504, y: 432 },
+    { kind: 'walker', x: 1272, y: 624 },
+  ],
 };
 
 const corridor: RoomDef = {
