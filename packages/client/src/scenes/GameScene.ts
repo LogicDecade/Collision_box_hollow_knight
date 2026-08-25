@@ -10,6 +10,7 @@ import { Enemy } from '../entities/enemies';
 import { ROOMS, RoomDef, roomLiveEnemies, START_ROOM, START_SPAWN } from '../world/rooms';
 import { loadSave, saveSave } from '../engine/save';
 import { showPause, hidePause } from '../ui/pause';
+import { isLoginOpen } from '../ui/login';
 
 interface PlayerVisual {
   c: Phaser.GameObjects.Container;
@@ -296,6 +297,14 @@ export class GameScene extends Phaser.Scene {
   // ---------------- 主循环 ----------------
   update(_time: number, delta: number): void {
     const dt = Math.min(delta / 1000, 1 / 30);
+
+    // 登录/注册打开时冻结世界：停止战斗系统(玩家/敌人/结算/输入全停)，只维持渲染
+    if (isLoginOpen()) {
+      this.drawHud();
+      this.renderAll(dt);
+      return;
+    }
+
     if (this.healFlashTimer > 0) this.healFlashTimer -= dt;
     if (this.transitionCd > 0) this.transitionCd -= dt;
 
