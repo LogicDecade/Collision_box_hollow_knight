@@ -6,8 +6,12 @@ import { Enemy } from '../packages/client/src/entities/enemies';
 import { Combat, Fighter } from '../packages/client/src/engine/hitbox';
 import { FEEL } from '../packages/client/src/engine/feel';
 import { ROOMS, roomLiveEnemies } from '../packages/client/src/world/rooms';
-import { parseRoom, roomToJSON, roomToTS, snapRect } from '../packages/client/src/editor/roomData';
+import { parseRoom, roomToJSON, roomToTS, snapRect, workingSetToEntryTS } from '../packages/client/src/editor/roomData';
 import { rectsOverlap } from '../packages/client/src/engine/rect';
+import { writeRoomsBlock, FENCE_START, FENCE_END } from '../packages/server/src/roomEditor';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FrameInput } from '../packages/client/src/engine/input';
 
 const DT = 1 / 60;
@@ -235,4 +239,60 @@ console.log('== 13. 编辑器数据层：TS/JSON 导出→解析往返一致 + �
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
-process.exit(fail ? 1 : 0);
+
+// ===== 14. 编辑器「保存到工程」：围栏整体替换 + 语法拒绝 + 外部保护 =====
+console.log('== 14. 编辑器保存到工程：围栏替换只动数据段、坏语法拒绝写入 ==');
+{
+  // 用临时文件模拟 rooms.ts（含围栏 + 围栏外代码），避免污染真文件
+  const dir = mkdtempSync(join(tmpdir(), 'cb-map-'));
+  const file = join(dir, 'rooms.ts');
+  const header =
+    'import type { Rect } from "./rect";\n' +
+    'export interface RoomDef { id: string; solids: Rect[]; }\n' +
+    FENCE_START + '\n' +
+    'const hub: RoomDef = { id: "hub", solids: [{ x: 0, y: 0, w: 10, h: 10 }] };\n' +
+    'const ROOMS_EDITOR: RoomDef[] = [hub];\n' +
+    FENCE_END + '\n' +
+    'export const ROOMS = { hub };\n';
+  writeFileSync(file, header, 'utf8');
+
+  // 1) 合法整块 → 成功，数据段替换、围栏与外部保留
+  const goodBlock = workingSetToEntryTS([
+    { id: 'hub', name: '客厅', w: 1600, h: 760, solids: [{ x: 0, y: 640, w: 1600, h: 120 }], spawns: [], transitions: [], enemies: [] },
+    { id: 'newroom', name: '新房间', w: 1000, h: 600, solids: [], spawns: [], transitions: [], enemies: [] },
+  ]);
+  const run = async () => {
+    const r1 = await writeRoomsBlock(goodBlock, file);
+    check('合法整块写入成功', r1.ok, r1.error);
+    const after1 = readFileSync(file, 'utf8');
+    check(
+      '数据段被新房子替换(含新增房间)',
+      after1.includes('const newroom: RoomDef') && after1.includes('const ROOMS_EDITOR: RoomDef[] = [hub, newroom];'),
+    );
+    check(
+      '围栏外部代码原样保留',
+      after1.includes('export interface RoomDef') && !after1.includes('solid: []'),
+    );
+    check(
+      '围栏标记完整(头尾各一)',
+      after1.split(FENCE_START).length === 2 && after1.split(FENCE_END).length === 2,
+    );
+
+    // 2) 坏语法 → 拒绝写入，文件保持原样
+    const before2 = readFileSync(file, 'utf8');
+    const r2 = await writeRoomsBlock('const broken: RoomDef = { id: "x", } MISSING }', file);
+    check('坏语法被拒绝', !r2.ok && /语法/.test(r2.error ?? ''));
+    check('拒绝时文件未被破坏', readFileSync(file, 'utf8') === before2);
+
+    // 3) 无围栏文件 → 拒绝且不改动
+    const plain = join(dir, 'plain.ts');
+    writeFileSync(plain, 'export const a = 1;', 'utf8');
+    const r3 = await writeRoomsBlock(goodBlock, plain);
+    check('无围栏文件被拒绝', !r3.ok, r3.error);
+
+    rmSync(dir, { recursive: true, force: true });
+    console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
+    process.exit(fail ? 1 : 0);
+  };
+  void run();
+}

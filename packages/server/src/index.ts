@@ -1,12 +1,41 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createUser, findUserByUsername } from './db.js';
 import { hashPassword, verifyPassword, signToken, verifyToken } from './auth.js';
+import { writeRoomsBlock, FENCE_START, FENCE_END } from './roomEditor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// ------- 编辑器写文件用的一次性 token（LAN 安全）-------
+function ensureEditorToken(): string {
+  // 持久化到工程根的 .dev-token（map 前导 + 24 字节随机 hex = 49 字符）
+  const p = resolve(__dirname, '../../../.dev-token');
+  try {
+    const existing = readFileSync(p, 'utf8').trim();
+    if (/^map_[0-9a-f]{48}$/.test(existing)) return existing;
+  } catch {
+    /* 无旧 token，生成新的 */
+  }
+  const t = 'map_' + randomBytes(24).toString('hex');
+  try {
+    writeFileSync(p, t, 'utf8');
+  } catch {
+    /* 写不进去（只读分区等）就纯内存 */
+  }
+  return t;
+}
+const EDITOR_TOKEN = ensureEditorToken();
+if (!process.env.SERVER_QUIET) {
+  console.log('\n──────────────────────────────────────────────');
+  console.log(`  地图编辑器保存 token：${EDITOR_TOKEN}`);
+  console.log('  在编辑器「保存到工程」里贴一次即可（浏览器记住）。');
+  console.log('──────────────────────────────────────────────\n');
+}
+
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } });
 
 // ------- 静态托管（生产模式：SERVER=prod，托管 client/dist） -------
@@ -80,6 +109,25 @@ app.get('/api/auth/me', async (req) => {
   if (!payload) return { user: null };
   return { user: { id: payload.sub, username: payload.username } };
 });
+
+// ------- 编辑器：保存到工程（需 map token）-------
+app.post('/api/editor/save-room', async (req, reply) => {
+  const body = (req.body ?? {}) as { token?: unknown; block?: unknown };
+  if (body.token !== EDITOR_TOKEN) {
+    return reply.code(401).send({ error: '无效的保存 token（请填启动日志里的 map token）' });
+  }
+  const block = typeof body.block === 'string' ? body.block : '';
+  if (!block.trim()) return reply.code(400).send({ error: '缺少地图数据' });
+  const res = await writeRoomsBlock(block);
+  if (!res.ok) return reply.code(400).send({ error: res.error });
+  app.log.info({ blockLines: res.blockLines }, 'editor saved rooms.ts');
+  return reply.send({ ok: true, hint: '已写回 rooms.ts（Vite 会自动刷新页面）' });
+});
+
+app.get('/api/editor/fences', async () => ({
+  start: FENCE_START,
+  end: FENCE_END,
+}));
 
 const port = Number(process.env.PORT || 3001);
 await app.listen({ port, host: '0.0.0.0' });

@@ -53,12 +53,10 @@ function fmtRect(r: Rect): string {
   return `{ x:${r.x}, y:${r.y}, w:${r.w}, h:${r.h} }`;
 }
 
-/** 导出为可直接替换 world/rooms.ts 某房间的 TS 常量片段 */
-export function roomToTS(room: RoomDef): string {
+/** 房间对象字面量本体（不含注释、不含 `id:` 前缀），供 roomToTS 与整块导出复用 */
+function roomObjBody(room: RoomDef): string {
   const line = (arr: string[]) => arr.map((s) => '    ' + s).join(',\n');
   return [
-    `// ${room.name} · id="${room.id}"（由碰撞箱地图编辑器生成）`,
-    `  ${room.id}: {`,
     `    id: ${JSON.stringify(room.id)},`,
     `    name: ${JSON.stringify(room.name)},`,
     `    w: ${room.w},`,
@@ -79,6 +77,15 @@ export function roomToTS(room: RoomDef): string {
     `    enemies: [`,
     line(room.enemies.map((e) => `{ kind:${JSON.stringify(e.kind)}, x:${e.x}, y:${e.y} }`)),
     `    ],`,
+  ].join('\n');
+}
+
+/** 导出为可直接替换 world/rooms.ts 某房间的属性片段（形如 `hub: {…}`，粘贴进 ROOMS 对象） */
+export function roomToTS(room: RoomDef): string {
+  return [
+    `// ${room.name} · id="${room.id}"（由碰撞箱地图编辑器生成）`,
+    `  ${room.id}: {`,
+    roomObjBody(room),
     `  },`,
   ].join('\n');
 }
@@ -137,4 +144,19 @@ export function parseRoom(input: string): RoomDef | null {
 
 export function newRoom(id: string): RoomDef {
   return { id, name: id, w: 1600, h: 760, solids: [], spawns: [], transitions: [], enemies: [] };
+}
+
+/**
+ * 把整个工作集导出为「整块」TS 数组源码，用于直接写回 world/rooms.ts 围栏之间。
+ * 结构：const hub: RoomDef = {…}; const corridor: RoomDef = {…}; 再以真实常量汇总 ROOMS_EDITOR（含新增房间）。
+ */
+export function workingSetToEntryTS(rooms: readonly RoomDef[]): string {
+  const defs = rooms.map((r) => {
+    const head = `// ${r.name} · id="${r.id}"（由碰撞箱地图编辑器生成）`;
+    const decl = `const ${r.id}: RoomDef = {`;
+    const tail = '};';
+    return [head, decl, roomObjBody(r), tail].join('\n');
+  });
+  const registry = `const ROOMS_EDITOR: RoomDef[] = [${rooms.map((r) => r.id).join(', ')}];`;
+  return defs.join('\n') + '\n' + registry;
 }

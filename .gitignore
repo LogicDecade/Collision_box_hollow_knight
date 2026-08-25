@@ -7,3 +7,7 @@ data/game.db-journal
 data/game.db-wal
 data/game.db-shm
 .env
+# 编辑器「保存到工程」写文件产物（勿入库）
+.dev-token
+.map-backups/
+packages/client/src/world/rooms.ts.tmp

@@ -31,6 +31,8 @@ export interface RoomDef {
   enemies: EnemyDef[];
 }
 
+// ════ 数据围栏（编辑器「保存到工程」只重写标记之间的内容；标记与类型/导出勿动） ════
+// ==== EDITOR_DATA_START ====
 const hub: RoomDef = {
   id: 'hub',
   name: '客厅 · Hub',
@@ -60,7 +62,6 @@ const hub: RoomDef = {
     { kind: 'walker', x: 1272, y: 624 },
   ],
 };
-
 const corridor: RoomDef = {
   id: 'corridor',
   name: '狭道 · Corridor',
@@ -89,7 +90,6 @@ const corridor: RoomDef = {
     { kind: 'walker', x: 900, y: 548 },
   ],
 };
-
 const arena: RoomDef = {
   id: 'arena',
   name: '演武场 · Arena',
@@ -111,8 +111,14 @@ const arena: RoomDef = {
     { kind: 'crawler', x: 1040, y: 648 },
   ],
 };
-
-export const ROOMS: Record<string, RoomDef> = { hub, corridor, arena };
+const ROOMS_EDITOR: RoomDef[] = [hub, corridor, arena];
+// ==== EDITOR_DATA_END ====
+// ════ 围栏结束 ════
+// 围栏内是编辑器维护的数据（房间常量 + ROOMS_EDITOR 汇总，随保存自动更新）；
+// 下方是只读的派生与导出，勿手改：
+export const ROOMS: Record<string, RoomDef> = Object.fromEntries(
+  ROOMS_EDITOR.map((r) => [r.id, r]),
+);
 export const START_ROOM = 'hub';
 export const START_SPAWN = 'enter';
 

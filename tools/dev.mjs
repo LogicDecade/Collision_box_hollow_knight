@@ -21,6 +21,7 @@ function up(pkg, cmd, args) {
 }
 
 console.log('[dev] 后端: http://localhost:3001  前端: http://localhost:5173');
+console.log('[dev] 编辑器「保存到工程」用的 map token 见上方后端启动日志。');
 up('server', 'npx', ['tsx', 'src/index.ts']);
 up('client', 'npx', ['vite', '--host', '0.0.0.0', '--port', '5173', '--strictPort']);
 

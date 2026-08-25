@@ -13,6 +13,7 @@ import {
   snap,
   snapRect,
 } from './roomData';
+import { getToken, setToken, saveRoomsToProject } from './save';
 // 需逃逸的文本值（房间名等）
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -445,13 +446,15 @@ class EditorScene extends Phaser.Scene {
         <section><h3>选中对象</h3><div data-act="obj:panel">（未选中）</div></section>
         <section><h3>导出 / 导入</h3>
           <div class="cb-row buttons">
+            <button data-act="save:project" class="cb-primary">保存到工程 ⤓</button>
             <button data-act="exp:ts">复制 TS</button>
             <button data-act="exp:json">下载 JSON</button>
             <button data-act="imp:open">导入</button>
           </div>
+          <label class="cb-row"><span>map token</span><input data-act="save:token" type="text" placeholder="后端启动日志里的 token" autocomplete="off"></label>
           <textarea data-act="imp:ta" rows="6" hidden></textarea>
           <button data-act="imp:apply" hidden>应用</button>
-          <p class="cb-hint">保存=本地预览；进游戏需用复制 TS 替换 world/rooms.ts 对应房间。</p>
+          <p class="cb-hint">「保存到工程」由本地后端直接改写 world/rooms.ts，保存后 Vite 自动刷新即可试玩。</p>
           <p class="cb-hint">拖拽：左键选择/移动，右键平移，滚轮缩放，Del 删除，Ctrl+Z/Y 撤销。</p>
         </section>
       </div>`;
@@ -485,6 +488,8 @@ class EditorScene extends Phaser.Scene {
       this.transSpawn = val;
     } else if (act === 'trans:to') {
       this.transTo = val;
+    } else if (act === 'save:token') {
+      setToken(val);
     } else if (act.startsWith('obj:set-')) {
       // 对象字段编辑（change 时记录一次历史）
       if (this.selected) this.pushHistory();
@@ -543,6 +548,21 @@ class EditorScene extends Phaser.Scene {
       } else {
         this.flash('导入失败：不是合法 JSON 或 RoomDef');
       }
+    } else if (act === 'save:project') {
+      const token = getToken();
+      if (!token) {
+        this.flash('请先在下方填 map token（后端启动日志里有）');
+        return;
+      }
+      const btn = el as HTMLButtonElement;
+      const prev = btn.textContent;
+      btn.textContent = '保存中…';
+      btn.disabled = true;
+      void saveRoomsToProject(Object.values(this.set.rooms), token).then((st) => {
+        btn.textContent = prev;
+        btn.disabled = false;
+        this.flash(st.ok ? `✔ ${st.msg}` : `✘ ${st.msg}`);
+      });
     } else if (act === 'nav:home') {
       location.href = '/';
     }
@@ -646,6 +666,8 @@ class EditorScene extends Phaser.Scene {
     enKindSel.value = this.enemyKind;
     snapChk.checked = this.snapOn;
     gridChk.checked = this.showGrid;
+    const tokenInp = panel.querySelector<HTMLInputElement>('[data-act="save:token"]');
+    if (tokenInp && getToken()) tokenInp.value = getToken();
 
     // 选中对象字段
     const s = this.selected;
