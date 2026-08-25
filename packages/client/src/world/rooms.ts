@@ -53,8 +53,6 @@ const hub: RoomDef = {
   ],
   transitions: [
     { rect: { x: 1540, y: 480, w: 60, h: 160 }, to: 'corridor', spawn: 'fromHub' },
-    // ⚠️ 编辑器里放的自循环过渡(本房间→本房间出生点)，先保留，无须可删
-    { rect: { x: 1548, y: 87, w: 48, h: 96 }, to: 'hub', spawn: 'enter' },
   ],
   enemies: [
     { kind: 'crawler', x: 520, y: 628 },
