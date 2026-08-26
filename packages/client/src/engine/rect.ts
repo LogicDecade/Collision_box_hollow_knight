@@ -33,25 +33,29 @@ export function moveAndSlide(
   dt: number,
   solids: readonly Rect[],
 ): MoveResult {
-  // 移动前已与实心重叠 = 出生点嵌入/卡实体。此时不做水平弹飞，
-  // 交由 Y 轴统一向上/向下归位，避免被当作“撞墙”横向甩出。
-  const embeddedBeforeX = vel.x !== 0 && solids.some((s) => rectsOverlap(body, s));
-
+  // 横向解算：移动后若与实心重叠，按速度方向把身体推回该实心边界。
+  // 唯一例外：该实心在竖直方向几乎完全包住身体（即 body 底远低于 solid 顶，
+  // 又 body 顶远高于 solid 底 = 真·横墙）才横推；若只是「脚踩/头顶/钻入地面」
+  // 这类竖直重叠（solid 顶在身体中部以下），把它当墙横推会把角色横向甩飞。
+  // 判定：body 的竖直范围与 solid 竖直范围的重叠深度 ≥ 身体高的 40% 即视为横墙。
+  const prevX = body.x;
   body.x += vel.x * dt;
   let wallLeft = false;
   let wallRight = false;
-  if (vel.x !== 0 && !embeddedBeforeX) {
+  if (vel.x !== 0 && body.x !== prevX) {
     for (const s of solids) {
-      if (rectsOverlap(body, s)) {
-        if (vel.x > 0) {
-          body.x = s.x - body.w;
-          wallRight = true;
-        } else if (vel.x < 0) {
-          body.x = s.x + s.w;
-          wallLeft = true;
-        }
-        break;
+      if (!rectsOverlap(body, s)) continue;
+      // 竖直重叠深度：身高的 40% 以下视为“浅接触”（脚踩地/贴屋顶），非横墙
+      const gapY = Math.min(body.y + body.h, s.y + s.h) - Math.max(body.y, s.y);
+      if (gapY < body.h * 0.4) continue;
+      if (vel.x > 0) {
+        body.x = s.x - body.w;
+        wallRight = true;
+      } else if (vel.x < 0) {
+        body.x = s.x + s.w;
+        wallLeft = true;
       }
+      break;
     }
   }
 
