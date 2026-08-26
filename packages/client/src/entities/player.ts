@@ -115,6 +115,7 @@ export class Player implements Fighter {
     this.vy = 0;
     this.facing = 1;
     this.hp = FEEL.maxHp;
+    this.soul = 0; // 重生灵魂清零
     this.invulnT = 1.0;
     this.alive = true;
     this.setState('idle');
@@ -207,7 +208,8 @@ export class Player implements Fighter {
     // ---- 攻击输入 ----
     if (input.attackPressed && this.atkCdT <= 0 && this.canAct()) {
       if (input.ly < 0) this.startAttack('upattack');
-      else if (input.ly > 0) this.startAttack('downattack');
+      // 下劈仅在空中有意义；平地 ↓+攻击 退化为平砍
+      else if (input.ly > 0 && !this.onGround) this.startAttack('downattack');
       else this.startAttack('attack');
     }
 
@@ -219,7 +221,9 @@ export class Player implements Fighter {
     const isAttack = this.state === 'attack' || this.state === 'upattack' || this.state === 'downattack';
 
     if (this.state === 'heal') {
-      // 蓄力回血：锁定移动，读满即消耗
+      // 蓄力回血：锁定移动并悬浮（速度清零，空中蓄魂不再继续上飘/下落），读满即消耗
+      this.vx = 0;
+      this.vy = 0;
       if (input.healHeld && this.soul >= FEEL.healCost) {
         this.healChargedT += dt;
         if (this.healChargedT >= FEEL.healChannel) {
@@ -332,8 +336,10 @@ export class Player implements Fighter {
       }
     }
 
-    // ---- 蓄力回血入口 ----
+    // ---- 蓄力回血入口（进入即锁定速度，确保浮在原地） ----
     if (input.healHeld && this.canAct() && this.soul >= FEEL.healCost && this.state !== 'heal') {
+      this.vx = 0;
+      this.vy = 0;
       this.setState('heal');
       this.healChargedT = 0;
     }

@@ -33,85 +33,96 @@ export interface RoomDef {
 
 // ════ 数据围栏（编辑器「保存到工程」只重写标记之间的内容；标记与类型/导出勿动） ════
 // ==== EDITOR_DATA_START ====
-const hub: RoomDef = {
-  id: 'hub',
-  name: '客厅 · Hub',
-  w: 1600,
-  h: 760,
-  solids: [
-    { x: 0, y: 640, w: 1600, h: 120 }, // 地板
-    { x: 0, y: 0, w: 40, h: 640 }, // 左墙
-    { x: 1560, y: 0, w: 40, h: 640 }, // 右墙
-    { x: 240, y: 456, w: 340, h: 24 }, // 平台 A（编辑器中改动）
-    { x: 648, y: 360, w: 144, h: 24 }, // 平台 B（编辑器中改动）
-    { x: 1220, y: 390, w: 220, h: 22 }, // 平台 C
-    { x: 130, y: 560, w: 60, h: 80 }, // 装饰立柱
-    { x: 840, y: 264, w: 264, h: 24 }, // 平台 D（编辑器中新增）
-    { x: 1152, y: 168, w: 408, h: 24 }, // 高台（编辑器中新增）
-  ],
-  spawns: [
-    { name: 'enter', x: 260, y: 618 },
-    { name: 'fromCorridor', x: 1500, y: 618 },
-  ],
-  transitions: [
-    { rect: { x: 1540, y: 480, w: 60, h: 160 }, to: 'corridor', spawn: 'fromHub' },
-  ],
-  enemies: [
-    { kind: 'crawler', x: 520, y: 628 },
-    { kind: 'crawler', x: 504, y: 432 },
-    { kind: 'walker', x: 1272, y: 624 },
-  ],
-};
-const corridor: RoomDef = {
-  id: 'corridor',
-  name: '狭道 · Corridor',
-  w: 1500,
-  h: 620,
-  solids: [
-    { x: 0, y: 560, w: 520, h: 60 }, // 地面段 1（左侧有坑）
-    { x: 700, y: 560, w: 520, h: 60 }, // 地面段 2
-    { x: 1280, y: 560, w: 220, h: 60 }, // 地面段 3（通arena）
-    { x: 0, y: 0, w: 40, h: 560 }, // 左墙
-    { x: 1460, y: 0, w: 40, h: 560 }, // 右墙
-    { x: 560, y: 430, w: 120, h: 20 }, // 坑上方平台
-    { x: 980, y: 480, w: 130, h: 20 },
-    { x: 380, y: 350, w: 120, h: 20 }, // 高台
-  ],
-  spawns: [
-    { name: 'fromHub', x: 120, y: 538 },
-    { name: 'fromArena', x: 1380, y: 538 },
-  ],
-  transitions: [
-    { rect: { x: 0, y: 460, w: 46, h: 120 }, to: 'hub', spawn: 'fromCorridor' },
-    { rect: { x: 1440, y: 440, w: 60, h: 140 }, to: 'arena', spawn: 'fromCorridor' },
-  ],
-  enemies: [
-    { kind: 'crawler', x: 260, y: 548 },
-    { kind: 'walker', x: 900, y: 548 },
-  ],
-};
-const arena: RoomDef = {
-  id: 'arena',
-  name: '演武场 · Arena',
-  w: 1700,
-  h: 760,
-  solids: [
-    { x: 0, y: 660, w: 1700, h: 100 }, // 地板
-    { x: 0, y: 0, w: 40, h: 660 }, // 左墙
-    { x: 1660, y: 0, w: 40, h: 660 }, // 右墙
-    { x: 480, y: 520, w: 240, h: 22 },
-    { x: 900, y: 460, w: 220, h: 22 },
-    { x: 1300, y: 540, w: 220, h: 22 },
-  ],
-  spawns: [{ name: 'fromCorridor', x: 140, y: 638 }],
-  transitions: [{ rect: { x: 0, y: 540, w: 46, h: 140 }, to: 'corridor', spawn: 'fromArena' }],
-  enemies: [
-    { kind: 'walker', x: 1320, y: 648 },
-    { kind: 'crawler', x: 720, y: 648 },
-    { kind: 'crawler', x: 1040, y: 648 },
-  ],
-};
-const ROOMS_EDITOR: RoomDef[] = [hub, corridor, arena];
+  // 客厅 · Hub · id="hub"（由碰撞箱地图编辑器生成）
+  const hub: RoomDef = {
+      id: "hub",
+      name: "客厅 · Hub",
+      w: 1600,
+      h: 760,
+      solids: [
+      { x:0, y:640, w:1600, h:120 },
+      { x:0, y:0, w:40, h:640 },
+      { x:1560, y:0, w:40, h:640 },
+      { x:240, y:456, w:340, h:24 },
+      { x:648, y:360, w:144, h:24 },
+      { x:1220, y:390, w:220, h:22 },
+      { x:130, y:560, w:60, h:80 },
+      { x:840, y:264, w:264, h:24 },
+      { x:1152, y:168, w:408, h:24 }
+      ],
+      spawns: [
+      { name:"enter", x:260, y:618 },
+      { name:"fromCorridor", x:1500, y:618 }
+      ],
+      transitions: [
+      { rect: { x:1540, y:480, w:60, h:160 }, to:"corridor", spawn:"fromHub" }
+      ],
+      enemies: [
+      { kind:"crawler", x:520, y:628 },
+      { kind:"crawler", x:504, y:432 },
+      { kind:"walker", x:1272, y:624 }
+      ],
+  };
+  // 狭道 · Corridor · id="corridor"（由碰撞箱地图编辑器生成）
+  const corridor: RoomDef = {
+      id: "corridor",
+      name: "狭道 · Corridor",
+      w: 1500,
+      h: 620,
+      solids: [
+      { x:0, y:552, w:408, h:72 },
+      { x:696, y:552, w:504, h:72 },
+      { x:1272, y:552, w:240, h:72 },
+      { x:0, y:0, w:40, h:560 },
+      { x:1464, y:0, w:48, h:552 },
+      { x:432, y:456, w:72, h:24 },
+      { x:240, y:360, w:144, h:24 },
+      { x:168, y:288, w:72, h:96 },
+      { x:312, y:216, w:288, h:24 },
+      { x:1368, y:336, w:24, h:168 },
+      { x:1320, y:480, w:48, h:72 },
+      { x:1200, y:360, w:72, h:24 }
+      ],
+      spawns: [
+      { name:"fromHub", x:120, y:538 },
+      { name:"fromArena", x:1380, y:538 }
+      ],
+      transitions: [
+      { rect: { x:0, y:460, w:46, h:120 }, to:"hub", spawn:"fromCorridor" },
+      { rect: { x:1440, y:440, w:60, h:140 }, to:"arena", spawn:"fromCorridor" }
+      ],
+      enemies: [
+      { kind:"crawler", x:260, y:548 },
+      { kind:"walker", x:900, y:548 }
+      ],
+  };
+  // 演武场 · Arena · id="arena"（由碰撞箱地图编辑器生成）
+  const arena: RoomDef = {
+      id: "arena",
+      name: "演武场 · Arena",
+      w: 1700,
+      h: 760,
+      solids: [
+      { x:0, y:660, w:1700, h:100 },
+      { x:0, y:0, w:40, h:660 },
+      { x:1660, y:0, w:40, h:660 },
+      { x:480, y:520, w:240, h:22 },
+      { x:900, y:460, w:220, h:22 },
+      { x:1300, y:540, w:220, h:22 }
+      ],
+      spawns: [
+      { name:"fromCorridor", x:140, y:638 }
+      ],
+      transitions: [
+      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena" }
+      ],
+      enemies: [
+      { kind:"walker", x:1320, y:648 },
+      { kind:"crawler", x:720, y:648 },
+      { kind:"crawler", x:1040, y:648 }
+      ],
+  };
+  const ROOMS_EDITOR: RoomDef[] = [hub, corridor, arena];
 // ==== EDITOR_DATA_END ====
 // ════ 围栏结束 ════
 // 围栏内是编辑器维护的数据（房间常量 + ROOMS_EDITOR 汇总，随保存自动更新）；

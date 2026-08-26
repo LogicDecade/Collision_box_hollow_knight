@@ -238,6 +238,43 @@ console.log('== 13. 编辑器数据层：TS/JSON 导出→解析往返一致 + �
   );
 }
 
+console.log('== 15. 蓄魂悬停不飘 / 平地禁下劈 / 重生清魂 ==');
+{
+  // 15a 跳跃中按蓄魂 → 悬停（位移很小，不再继续上飘）
+  const s = makeSim(260, 619);
+  s.player.soul = 66;
+  s.run(3, () => inp({})); // 落地稳定 onGround
+  s.run(1, () => inp({ jumpPressed: true, jumpHeld: true })); // 起跳
+  let minY = Infinity;
+  let maxY = -Infinity;
+  s.run(50, () => {
+    minY = Math.min(minY, s.player.y);
+    maxY = Math.max(maxY, s.player.y);
+    return inp({ healHeld: true });
+  });
+  const span = maxY - minY;
+  check('空中蓄魂悬停(上下位移<14px)', span < 14, `span=${span.toFixed(1)} y=${s.player.y.toFixed(1)}`);
+
+  // 15b 平地 ↓+攻击 → 平砍（而非下劈）
+  const s2 = makeSim(260, 619);
+  s2.run(6, () => inp({})); // 落地
+  s2.run(1, () => inp({ ly: 1, attackPressed: true }));
+  check(
+    '平地↓+攻击为平砍',
+    s2.player.state === 'attack' && s2.player.swingBox !== null && s2.player.swingBox.w === FEEL.attackBox.w,
+    `state=${s2.player.state} boxW=${s2.player.swingBox?.w}`,
+  );
+
+  // 15c 重生后灵魂清零
+  const s3 = makeSim(260, 619);
+  s3.player.soul = 50;
+  s3.player.hp = 1;
+  s3.player.invulnT = 0;
+  s3.player.takeHit({ damage: 1, knockX: 0, knockY: 0 }, 1);
+  s3.player.respawn(260, 619);
+  check('重生后灵魂清零', s3.player.soul === 0, `soul=${s3.player.soul}`);
+}
+
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
 
 // ===== 14. 编辑器「保存到工程」：围栏整体替换 + 语法拒绝 + 外部保护 =====
