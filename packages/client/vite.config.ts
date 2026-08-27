@@ -18,8 +18,8 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: {
+        // 生产只发游戏主页；编辑器(editor.html)是开发工具，不随构建产物上传
         main: rp('index.html'),
-        editor: rp('editor.html'),
       },
     },
   },

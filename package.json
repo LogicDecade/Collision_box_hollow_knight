@@ -4,11 +4,12 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "dev": "node tools/dev.mjs",
-    "dev:client": "npm run dev -w client",
-    "dev:server": "npm run dev -w server",
-    "build:client": "npm run build -w client",
-    "build:all": "npm run build -w client",
-    "start:server": "SERVER=prod npm run dev -w server",
+    "dev:client": "npm run dev -w @collision-box/client",
+    "dev:server": "npm run dev -w @collision-box/server",
+    "build:client": "npm run build -w @collision-box/client",
+    "build:server": "npm run build -w @collision-box/server",
+    "build:all": "npm run build -w @collision-box/client && npm run build -w @collision-box/server",
+    "start:server": "SERVER=prod node packages/server/dist/index.js",
     "test": "tsx tools/smoke.ts",
     "typecheck": "tsc -p packages/client/tsconfig.json --noEmit && tsc -p packages/server/tsconfig.json --noEmit"
   },

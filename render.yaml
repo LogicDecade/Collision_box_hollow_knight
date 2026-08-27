@@ -1,0 +1,16 @@
+# Render Blueprint：一键部署「碰撞箱」（后端托管前端，同源无 CORS）
+# 用法：把仓库推到 GitHub 后，在 Render 创建 Blueprint 选择本仓库即可。
+services:
+  - type: web
+    name: collision-box
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:all
+    startCommand: npm run start:server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # 生产强制要求；此处自动生成随机值并注入（跨部署稳定）
+      - key: JWT_SECRET
+        generateValue: true

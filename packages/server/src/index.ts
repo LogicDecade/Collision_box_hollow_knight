@@ -9,11 +9,18 @@ import { hashPassword, verifyPassword, signToken, verifyToken } from './auth.js'
 import { writeRoomsBlock, FENCE_START, FENCE_END } from './roomEditor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const IS_PROD = process.env.SERVER === 'prod';
 
-// ------- 编辑器写文件用的一次性 token（LAN 安全）-------
+// 生产必须显式配置 JWT_SECRET，拒绝用默认值（否则任何人都能伪造会话）
+if (IS_PROD && !process.env.JWT_SECRET) {
+  console.error('[fatal] 生产环境必须设置环境变量 JWT_SECRET（Render 控制台 or render.yaml 会自动生成）');
+  process.exit(1);
+}
+
+// ------- 编辑器写文件用的一次性 token（仅本地开发；生产不暴露该能力） -------
 function ensureEditorToken(): string {
   // 持久化到工程根的 .dev-token（map 前导 + 24 字节随机 hex = 49 字符）
-  const p = resolve(__dirname, '../../../.dev-token');
+  const p = resolve(__dirname, '../../.dev-token');
   try {
     const existing = readFileSync(p, 'utf8').trim();
     if (/^map_[0-9a-f]{48}$/.test(existing)) return existing;
@@ -28,8 +35,8 @@ function ensureEditorToken(): string {
   }
   return t;
 }
-const EDITOR_TOKEN = ensureEditorToken();
-if (!process.env.SERVER_QUIET) {
+const EDITOR_TOKEN = IS_PROD ? '' : ensureEditorToken();
+if (!IS_PROD && !process.env.SERVER_QUIET) {
   console.log('\n──────────────────────────────────────────────');
   console.log(`  地图编辑器保存 token：${EDITOR_TOKEN}`);
   console.log('  在编辑器「保存到工程」里贴一次即可（浏览器记住）。');
@@ -40,11 +47,16 @@ const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } });
 
 // ------- 静态托管（生产模式：SERVER=prod，托管 client/dist） -------
 // dev 模式（默认）：Vite 承担前端，/api 由 Vite proxy 转发，无需本段。
-if (process.env.SERVER === 'prod') {
-  const clientDist = join(__dirname, '../../../client/dist');
+if (IS_PROD) {
+  // 从编译产物 dist/ 到 packages/client/dist：dist → server → packages → client/dist
+  const clientDist = join(__dirname, '../../client/dist');
   if (existsSync(clientDist)) {
     await app.register(fastifyStatic, { root: clientDist, index: [ 'index.html' ] });
     app.setNotFoundHandler((req, reply) => {
+      // 编辑器是开发工具，生产明确不可达
+      if (req.url.startsWith('/editor')) {
+        return reply.code(404).send({ error: 'not_found' });
+      }
       if (req.method === 'GET' && !req.url.startsWith('/api/')) {
         return reply.sendFile('index.html');
       }
@@ -110,24 +122,26 @@ app.get('/api/auth/me', async (req) => {
   return { user: { id: payload.sub, username: payload.username } };
 });
 
-// ------- 编辑器：保存到工程（需 map token）-------
-app.post('/api/editor/save-room', async (req, reply) => {
-  const body = (req.body ?? {}) as { token?: unknown; block?: unknown };
-  if (body.token !== EDITOR_TOKEN) {
-    return reply.code(401).send({ error: '无效的保存 token（请填启动日志里的 map token）' });
-  }
-  const block = typeof body.block === 'string' ? body.block : '';
-  if (!block.trim()) return reply.code(400).send({ error: '缺少地图数据' });
-  const res = await writeRoomsBlock(block);
-  if (!res.ok) return reply.code(400).send({ error: res.error });
-  app.log.info({ blockLines: res.blockLines }, 'editor saved rooms.ts');
-  return reply.send({ ok: true, hint: '已写回 rooms.ts（Vite 会自动刷新页面）' });
-});
+// ------- 编辑器：保存到工程（需 map token；仅本地开发，生产不暴露写盘能力） -------
+if (!IS_PROD) {
+  app.post('/api/editor/save-room', async (req, reply) => {
+    const body = (req.body ?? {}) as { token?: unknown; block?: unknown };
+    if (body.token !== EDITOR_TOKEN) {
+      return reply.code(401).send({ error: '无效的保存 token（请填启动日志里的 map token）' });
+    }
+    const block = typeof body.block === 'string' ? body.block : '';
+    if (!block.trim()) return reply.code(400).send({ error: '缺少地图数据' });
+    const res = await writeRoomsBlock(block);
+    if (!res.ok) return reply.code(400).send({ error: res.error });
+    app.log.info({ blockLines: res.blockLines }, 'editor saved rooms.ts');
+    return reply.send({ ok: true, hint: '已写回 rooms.ts（Vite 会自动刷新页面）' });
+  });
 
-app.get('/api/editor/fences', async () => ({
-  start: FENCE_START,
-  end: FENCE_END,
-}));
+  app.get('/api/editor/fences', async () => ({
+    start: FENCE_START,
+    end: FENCE_END,
+  }));
+}
 
 const port = Number(process.env.PORT || 3001);
 await app.listen({ port, host: '0.0.0.0' });
