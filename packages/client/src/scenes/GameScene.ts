@@ -445,9 +445,34 @@ export class GameScene extends Phaser.Scene {
 
   private openPause(): void {
     this.scene.pause();
-    showPause(() => {
-      hidePause();
-      this.scene.resume();
+    showPause(
+      () => {
+        hidePause();
+        this.scene.resume();
+      },
+      () => {
+        hidePause();
+        this.scene.resume();
+        this.resetRun();
+      },
+    );
+  }
+
+  /** 重新开始：清空击杀记录(小怪全部复活)、血魂回满，从第一间出生点重新开始并重置存档 */
+  private resetRun(): void {
+    this.killedEnemies.clear();
+    this.fadeRect.setAlpha(0);
+    this.tweens.add({
+      targets: this.fadeRect,
+      alpha: 1,
+      duration: 420,
+      onComplete: () => {
+        this.loadRoom(START_ROOM, START_SPAWN);
+        this.player.respawn(this.player.x, this.player.y);
+        this.nudgePlayerSpawn();
+        this.save();
+        this.tweens.add({ targets: this.fadeRect, alpha: 0, duration: 420 });
+      },
     });
   }
 }

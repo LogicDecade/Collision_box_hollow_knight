@@ -4,6 +4,7 @@ import { Input } from '../engine/input';
 
 let overlay: HTMLElement | null = null;
 let onResumeCb: (() => void) | null = null;
+let onRestartCb: (() => void) | null = null;
 
 const CSS_ID = 'cb-pause-css';
 const CSS = `
@@ -21,13 +22,15 @@ const CSS = `
   white-space: pre-line; border-top: 1px solid #2c2c28; border-bottom: 1px solid #2c2c28;
   padding: 16px 0; margin-bottom: 26px;
 }
-.cb-pause-btns { display: flex; gap: 12px; }
+.cb-pause-btns { display: flex; gap: 12px; flex-wrap: wrap; }
 .cb-btn {
   flex: 1; padding: 11px 0; font-size: 14px; letter-spacing: 0.08em;
   background: transparent; cursor: pointer; border: 1px solid #3a3a36; color: #d8d8d2;
 }
 .cb-btn:hover { border-color: #72c9f2; color: #72c9f2; }
 .cb-btn.cb-primary { border-color: #72c9f2; color: #72c9f2; }
+.cb-btn.cb-danger { border-color: #e06b4f; color: #e06b4f; }
+.cb-btn.cb-danger:hover { border-color: #ff8a70; color: #ff8a70; }
 `;
 
 function ensureStyle(): void {
@@ -72,21 +75,28 @@ function build(): void {
   resumeBtn.textContent = '继续';
   btns.appendChild(resumeBtn);
 
+  const restartBtn = document.createElement('button');
+  restartBtn.className = 'cb-btn cb-danger';
+  restartBtn.textContent = '重新开始';
+  btns.appendChild(restartBtn);
+
   const logoutBtn = document.createElement('button');
   logoutBtn.className = 'cb-btn';
   logoutBtn.textContent = '退出登录';
   btns.appendChild(logoutBtn);
 
   resumeBtn.onclick = () => onResumeCb?.();
+  restartBtn.onclick = () => onRestartCb?.();
   logoutBtn.onclick = () => {
     clearToken();
     location.reload();
   };
 }
 
-export function showPause(onResume: () => void): void {
+export function showPause(onResume: () => void, onRestart?: () => void): void {
   if (!overlay) build();
   onResumeCb = onResume;
+  onRestartCb = onRestart ?? null;
   overlay!.style.display = 'flex';
 }
 
