@@ -80,3 +80,34 @@ export function isGroundedBelow(body: Rect, groundCheckY: number, solids: readon
   const probe: Rect = { x: body.x + 1, y: groundCheckY, w: body.w - 2, h: 3 };
   return solids.some((s) => rectsOverlap(probe, s));
 }
+
+/**
+ * 把矩形从所有重叠实心中推出（去嵌入）。用于限制重生/出生点位置：
+ * 若出生点被摆进墙或地里，将其推到最近的合法位置——优先垂直（向上脱困，
+ * 贴地落下），取最小位移避免大跳变。返回推出后的新矩形。
+ */
+export function depenetrate(rect: Rect, solids: readonly Rect[]): Rect {
+  const r = { ...rect };
+  // 迭代处理连锁重叠（推出后可能又压到相邻实心）
+  for (let iter = 0; iter < 8; iter++) {
+    const s = solids.find((c) => rectsOverlap(r, c));
+    if (!s) break;
+    // 四向推出量（单位：把 r 移到 s 之外的移动距离）
+    const up = r.y + r.h - s.y; // 上移使底贴 s.顶
+    const down = s.y + s.h - r.y; // 下移使顶贴 s.底
+    const left = r.x + r.w - s.x; // 左移使右贴 s.左
+    const right = s.x + s.w - r.x; // 右移使左贴 s.右
+    // 选最小正位移；两向相等时偏垂直（优先向上）
+    const upMove = { d: up, axis: 'y' as const, sign: -1 as const };
+    const downMove = { d: down, axis: 'y' as const, sign: 1 as const };
+    const leftMove = { d: left, axis: 'x' as const, sign: -1 as const };
+    const rightMove = { d: right, axis: 'x' as const, sign: 1 as const };
+    const moves = [upMove, downMove, leftMove, rightMove].sort(
+      (a, b) => a.d - b.d || (a.axis === 'y' ? -1 : 1),
+    );
+    const best = moves[0];
+    if (best.axis === 'y') r.y += best.sign * best.d;
+    else r.x += best.sign * best.d;
+  }
+  return r;
+}

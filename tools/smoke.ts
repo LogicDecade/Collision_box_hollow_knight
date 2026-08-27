@@ -7,7 +7,7 @@ import { Combat, Fighter } from '../packages/client/src/engine/hitbox';
 import { FEEL } from '../packages/client/src/engine/feel';
 import { ROOMS, roomLiveEnemies } from '../packages/client/src/world/rooms';
 import { parseRoom, roomToJSON, roomToTS, snapRect, workingSetToEntryTS } from '../packages/client/src/editor/roomData';
-import { rectsOverlap } from '../packages/client/src/engine/rect';
+import { rectsOverlap, depenetrate } from '../packages/client/src/engine/rect';
 import { writeRoomsBlock, FENCE_START, FENCE_END } from '../packages/server/src/roomEditor';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -273,6 +273,22 @@ console.log('== 15. 蓄魂悬停不飘 / 平地禁下劈 / 重生清魂 ==');
   s3.player.takeHit({ damage: 1, knockX: 0, knockY: 0 }, 1);
   s3.player.respawn(260, 619);
   check('重生后灵魂清零', s3.player.soul === 0, `soul=${s3.player.soul}`);
+}
+
+console.log('== 16. 限制重生点位置：出生点嵌地形时被推出到合法位置 ==');
+{
+  // corridor fromArena 出生点(1380,538)：嵌地面(顶552)+贴附竖柱 → depenetrate 应无重叠且贴地
+  const cor = ROOMS.corridor;
+  const sp = cor.spawns.find((s) => s.name === 'fromArena')!;
+  const raw = { x: sp.x - 13, y: sp.y - 21, w: 26, h: 42 }; // 玩家 body
+  const safe = depenetrate(raw, cor.solids);
+  check('嵌地出生点被推出(无重叠)', !cor.solids.some((s) => rectsOverlap(safe, s)), JSON.stringify(safe));
+  check('推出后贴地(脚底=552)', Math.abs(safe.y + safe.h - 552) < 0.5, `bottom=${safe.y + safe.h}`);
+
+  // 完全嵌入墙内（模拟最坏情况）也应能推出
+  const inWall = { x: 1472 - 13, y: 531 - 21, w: 26, h: 42 };
+  const out = depenetrate(inWall, cor.solids);
+  check('完全嵌墙被推出到墙外', !cor.solids.some((s) => rectsOverlap(out, s)), JSON.stringify(out));
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

@@ -4,7 +4,7 @@ import { COLORS, DEPTH, WORLD_H, WORLD_W } from '../engine/constants';
 import { FEEL } from '../engine/feel';
 import { Input } from '../engine/input';
 import { Combat, Fighter } from '../engine/hitbox';
-import { rectsOverlap } from '../engine/rect';
+import { rectsOverlap, depenetrate } from '../engine/rect';
 import { Player } from '../entities/player';
 import { Enemy } from '../entities/enemies';
 import { ROOMS, RoomDef, roomLiveEnemies, START_ROOM, START_SPAWN } from '../world/rooms';
@@ -135,6 +135,7 @@ export class GameScene extends Phaser.Scene {
     this.player.vx = 0;
     this.player.vy = 0;
     this.player.invulnT = 0.8;
+    this.nudgePlayerSpawn();
 
     // 按击杀记录生成存活敌人（击杀的在本房间不再出现）
     const liveRefs = roomLiveEnemies(this.roomId, this.room.enemies, this.killedEnemies);
@@ -166,6 +167,13 @@ export class GameScene extends Phaser.Scene {
       .filter((s) => s.y >= topY)
       .sort((a, b) => a.y - b.y)[0];
     if (below) e.y = below.y - e.h / 2 - 0.5;
+  }
+
+  /** 限制重生点位置：若出生点被摆进墙/地里，把玩家推送到最近的合法落点 */
+  private nudgePlayerSpawn(): void {
+    const safe = depenetrate(this.player.rect(), this.room.solids);
+    this.player.x = safe.x + this.player.w / 2;
+    this.player.y = safe.y + this.player.h / 2;
   }
 
   private rebuildRoomLayer(): void {
@@ -289,6 +297,7 @@ export class GameScene extends Phaser.Scene {
         // 重生：重置当前房间（敌人复活），回到出生点
         this.loadRoom(this.roomId, sp.name);
         this.player.respawn(sp.x, sp.y);
+        this.nudgePlayerSpawn();
         this.tweens.add({ targets: this.fadeRect, alpha: 0, duration: 420 });
       },
     });
