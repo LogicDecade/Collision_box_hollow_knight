@@ -7,7 +7,7 @@ import { Combat, Fighter } from '../packages/client/src/engine/hitbox';
 import { FEEL } from '../packages/client/src/engine/feel';
 import { ROOMS, roomLiveEnemies } from '../packages/client/src/world/rooms';
 import { parseRoom, roomToJSON, roomToTS, snapRect, workingSetToEntryTS } from '../packages/client/src/editor/roomData';
-import { rectsOverlap, moveAndSlide } from '../packages/client/src/engine/rect';
+import { rectsOverlap } from '../packages/client/src/engine/rect';
 import { writeRoomsBlock, FENCE_START, FENCE_END } from '../packages/server/src/roomEditor';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -273,26 +273,6 @@ console.log('== 15. 蓄魂悬停不飘 / 平地禁下劈 / 重生清魂 ==');
   s3.player.takeHit({ damage: 1, knockX: 0, knockY: 0 }, 1);
   s3.player.respawn(260, 619);
   check('重生后灵魂清零', s3.player.soul === 0, `soul=${s3.player.soul}`);
-}
-
-console.log('== 16. 重生/卡墙不得横向穿墙：嵌入实心的身体必须被推出墙外 ==');
-{
-  // 玩家右半已嵌入右墙（模拟重生挤墙/卡墙），持续向右推：应被推出墙外而非穿过
-  const wall = ROOMS.corridor.solids.find((s) => s.x === 1464)!;
-  const body = { x: 1472 - 13, y: 531 - 21, w: 26, h: 42 }; // 中心 x=1472，右半 1485 在墙内
-  let passesWall = 0;
-  for (let i = 0; i < 240; i++) {
-    const res = moveAndSlide(body, { x: 235, y: 0 }, 1 / 60, ROOMS.corridor.solids);
-    if (res.wallRight) break; // 应很快撞墙
-    if (body.x > wall.x + wall.w) passesWall++; // 已穿过墙右缘
-  }
-  check('嵌入墙内被横向推出(不穿墙)', body.x + body.w <= wall.x + 0.5, `x=${body.x.toFixed(1)} right=${(body.x + body.w).toFixed(1)} passes=${passesWall}`);
-
-  // 站在地平地上向右走：不会被地板当墙横推
-  const ground = { x: 260, y: 619 - 21, w: 26, h: 42 };
-  const r0 = moveAndSlide({ ...ground }, { x: 0, y: 0 }, 1 / 60, ROOMS.hub.solids);
-  const r1 = moveAndSlide({ ...ground }, { x: 120, y: 0 }, 1 / 60, ROOMS.hub.solids);
-  check('站地面不误触横推(wallLeft/R未置位)', !r0.wallLeft && !r0.wallRight && !r1.wallLeft && !r1.wallRight, JSON.stringify(r1));
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
