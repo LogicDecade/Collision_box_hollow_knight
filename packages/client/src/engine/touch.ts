@@ -1,23 +1,31 @@
 // 移动端触屏控制：左半屏「跟随拇指」虚拟摇杆 + 右侧动作键（跳/攻/魂/方向/暂停）。
-// 仅在触屏设备上挂载（桌面键盘不受影响）；登录层(1000)/暂停层(900) z-index 更高，
-// 打开时会自然盖住本控件，触屏输入随之失效。
+// 全部用 Pointer Events（鼠标/触摸/笔统一），且仅当主要指针是触屏(coarse)才挂载，
+// 避免带触屏的笔记本在桌面鼠标模式下误显示却点不动。
 import type { FrameInput } from './input';
 
 const CSS_ID = 'cb-touch-css';
 const CSS = `
-.cb-touch { position: fixed; inset: 0; z-index: 800; touch-action: none; user-select: none; -webkit-user-select: none; }
-.cb-touch-move { position: absolute; left: 0; top: 0; width: 58%; height: 100%; }
+.cb-touch { position: fixed; inset: 0; z-index: 800; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.cb-touch-move { position: absolute; left: 0; top: 0; width: 58%; height: 100%; touch-action: none; }
 .cb-touch-stick { position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%; border: 2px solid rgba(114,201,242,0.35); background: rgba(114,201,242,0.10); pointer-events: none; display: none; }
 .cb-touch-btns { position: absolute; right: 16px; bottom: 30px; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 14px; }
-.cb-touch-key { width: 78px; height: 78px; border-radius: 50%; border: 1.5px solid rgba(216,216,210,0.4); background: rgba(28,28,24,0.5); color: #d8d8d2; font-size: 15px; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; }
+.cb-touch-key { width: 78px; height: 78px; border-radius: 50%; border: 1.5px solid rgba(216,216,210,0.4); background: rgba(28,28,24,0.5); color: #d8d8d2; font-size: 15px; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; touch-action: none; -webkit-touch-callout: none; }
 .cb-touch-key:active { background: rgba(114,201,242,0.28); border-color: #72c9f2; }
 .cb-touch-key.cb-key-heal { background: rgba(224,107,79,0.22); border-color: rgba(224,107,79,0.5); color: #ffc9bd; }
 .cb-touch-dir { width: 62px; height: 62px; font-size: 20px; }
 .cb-touch-pause { position: absolute; right: 16px; top: max(16px, env(safe-area-inset-top)); width: 46px; height: 46px; font-size: 14px; border-radius: 8px; }
 `;
 
-export const isTouchDevice = (): boolean =>
-  typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+/** 仅“主要输入是指针(coarse)=手机/平板”或至少支持触摸时才启用触屏控件 */
+export const isTouchDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.matchMedia?.('(pointer: coarse)')?.matches) return true;
+  } catch {
+    /* 老环境 */
+  }
+  return 'ontouchstart' in window;
+};
 
 export class TouchControls {
   private lx = 0;
@@ -27,8 +35,8 @@ export class TouchControls {
   private atkTick = false;
   private healHeld = false;
   private pauseTick = false;
+  private activeId: number | null = null;
   private anchorX = 0;
-  private activeTouchId = -1;
   private root: HTMLElement | null = null;
   private stick: HTMLElement | null = null;
 
@@ -60,12 +68,17 @@ export class TouchControls {
     this.root = root;
     this.stick = root.querySelector<HTMLElement>('.cb-touch-stick');
 
-    const move = root.querySelector<HTMLElement>('.cb-touch-move')!;
-    move.addEventListener('touchstart', (e) => this.onMoveStart(e), { passive: true });
-    move.addEventListener('touchmove', (e) => this.onMove(e), { passive: false });
-    move.addEventListener('touchend', (e) => this.onMoveEnd(e), { passive: true });
-    move.addEventListener('touchcancel', (e) => this.onMoveEnd(e), { passive: true });
+    // 长按弹右键菜单/选中
+    root.addEventListener('contextmenu', (e) => e.preventDefault());
 
+    // 左半屏移动区：只跟第一个按下的指针（多指时其余忽略）
+    const move = root.querySelector<HTMLElement>('.cb-touch-move')!;
+    move.addEventListener('pointerdown', (e) => this.moveDown(e));
+    move.addEventListener('pointermove', (e) => this.moveMove(e));
+    move.addEventListener('pointerup', (e) => this.moveEnd(e));
+    move.addEventListener('pointercancel', (e) => this.moveEnd(e));
+
+    // 动作键
     for (const btn of root.querySelectorAll<HTMLElement>('[data-k]')) {
       const k = btn.dataset.k!;
       if (k === 'dir') {
@@ -76,72 +89,57 @@ export class TouchControls {
         continue;
       }
       if (k === 'pause') {
-        btn.addEventListener('touchstart', (e) => {
+        btn.addEventListener('pointerdown', (e) => {
           e.preventDefault();
           this.pauseTick = true;
-        }, { passive: false });
+        });
         continue;
       }
-      // 攻 / 跳 / 魂：touchstart 设标志，touchend 清除按住态
-      btn.addEventListener('touchstart', (e) => {
+      btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         if (k === 'atk') this.atkTick = true;
-        else if (k === 'jump') { this.jumpPressed(); }
+        else if (k === 'jump') this.jumpTick = true;
         else if (k === 'heal') this.healHeld = true;
-      }, { passive: false });
-      btn.addEventListener('touchend', () => {
+      });
+      const up = (): void => {
         if (k === 'jump') this.jumpHeld = false;
         else if (k === 'heal') this.healHeld = false;
-      }, { passive: true });
-      btn.addEventListener('touchcancel', () => {
-        if (k === 'jump') this.jumpHeld = false;
-        else if (k === 'heal') this.healHeld = false;
-      }, { passive: true });
+      };
+      btn.addEventListener('pointerup', up);
+      btn.addEventListener('pointercancel', up);
+      btn.addEventListener('pointerleave', up);
     }
   }
 
-  private jumpPressed(): void {
-    this.jumpTick = true;
-    this.jumpHeld = true;
-  }
-
-  private onMoveStart(e: TouchEvent): void {
-    const t = e.touches[0];
-    if (!t || this.activeTouchId !== -1) return;
-    this.activeTouchId = t.identifier;
-    this.anchorX = t.clientX;
+  private moveDown(e: PointerEvent): void {
+    if (this.activeId !== null) return;
+    this.activeId = e.pointerId;
+    this.anchorX = e.clientX;
     this.lx = 0;
     if (this.stick) {
       this.stick.style.display = 'block';
-      this.stick.style.left = `${t.clientX}px`;
-      this.stick.style.top = `${t.clientY}px`;
+      this.stick.style.left = `${e.clientX}px`;
+      this.stick.style.top = `${e.clientY}px`;
     }
   }
 
-  private onMove(e: TouchEvent): void {
-    for (const t of Array.from(e.touches)) {
-      if (t.identifier !== this.activeTouchId) continue;
-      const dx = t.clientX - this.anchorX;
-      const dead = 14;
-      this.lx = Math.max(-1, Math.min(1, (Math.abs(dx) < dead ? 0 : (dx - Math.sign(dx) * dead)) / 54));
-      if (this.stick) {
-        this.stick.style.left = `${t.clientX}px`;
-        this.stick.style.top = `${t.clientY}px`;
-      }
-      e.preventDefault();
-      break;
+  private moveMove(e: PointerEvent): void {
+    if (e.pointerId !== this.activeId) return;
+    const dx = e.clientX - this.anchorX;
+    const dead = 14;
+    this.lx = Math.max(-1, Math.min(1, (Math.abs(dx) < dead ? 0 : (dx - Math.sign(dx) * dead)) / 54));
+    if (this.stick) {
+      this.stick.style.left = `${e.clientX}px`;
+      this.stick.style.top = `${e.clientY}px`;
     }
+    e.preventDefault();
   }
 
-  private onMoveEnd(e: TouchEvent): void {
-    for (const t of Array.from(e.changedTouches)) {
-      if (t.identifier === this.activeTouchId) {
-        this.activeTouchId = -1;
-        this.lx = 0;
-        if (this.stick) this.stick.style.display = 'none';
-        break;
-      }
-    }
+  private moveEnd(e: PointerEvent): void {
+    if (e.pointerId !== this.activeId) return;
+    this.activeId = null;
+    this.lx = 0;
+    if (this.stick) this.stick.style.display = 'none';
   }
 
   detach(): void {
@@ -151,6 +149,7 @@ export class TouchControls {
     this.lx = 0;
     this.jumpHeld = false;
     this.healHeld = false;
+    this.activeId = null;
   }
 
   /** 采样一帧输入（just-pressed 标志读取后复位；方向按钮给 ly 作为攻击方向） */
