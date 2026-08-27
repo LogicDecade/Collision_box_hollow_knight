@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { COLORS, DEPTH, WORLD_H, WORLD_W } from '../engine/constants';
 import { FEEL } from '../engine/feel';
 import { Input } from '../engine/input';
+import { TouchControls, isTouchDevice } from '../engine/touch';
 import { Combat, Fighter } from '../engine/hitbox';
 import { rectsOverlap, depenetrate } from '../engine/rect';
 import { Player } from '../entities/player';
@@ -25,6 +26,7 @@ interface EnemyVisual {
 
 export class GameScene extends Phaser.Scene {
   private inputManager!: Input;
+  private touch: TouchControls | null = null;
   private combat!: Combat;
   private player!: Player;
   private enemies: Enemy[] = [];
@@ -59,6 +61,10 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
     this.inputManager = new Input(this);
+    if (isTouchDevice()) {
+      this.touch = new TouchControls();
+      this.touch.attach();
+    }
     this.combat = new Combat();
     this.player = new Player(0, 0);
     this.player.init(this.combat);
@@ -318,6 +324,17 @@ export class GameScene extends Phaser.Scene {
     if (this.transitionCd > 0) this.transitionCd -= dt;
 
     const inp = this.inputManager.update();
+    // 移动端触屏：与键盘帧合并（触屏轴覆盖键盘轴；按键取并集；暂停键并入）
+    if (this.touch) {
+      const t = this.touch.sample();
+      if (t.lx !== 0) inp.lx = t.lx;
+      if (t.ly !== 0) inp.ly = t.ly;
+      inp.jumpPressed = inp.jumpPressed || t.jumpPressed;
+      inp.jumpHeld = inp.jumpHeld || t.jumpHeld;
+      inp.attackPressed = inp.attackPressed || t.attackPressed;
+      inp.healHeld = inp.healHeld || t.healHeld;
+      inp.pausePressed = inp.pausePressed || t.pausePressed;
+    }
     if (inp.pausePressed) this.openPause();
 
     // 卡肉（hitstop）：世界冻结，只渲染不推进
