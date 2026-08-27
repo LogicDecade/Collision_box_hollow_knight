@@ -3,6 +3,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { networkInterfaces } from 'node:os';
 
 const root = process.cwd();
 
@@ -22,6 +23,14 @@ function up(pkg, cmd, args) {
 
 console.log('[dev] 后端: http://localhost:3001  前端: http://localhost:5173');
 console.log('[dev] 编辑器「保存到工程」用的 map token 见上方后端启动日志。');
+// 打印全部局域网 IPv4，手机/局域网访问直接用（IP 变化时从这里看最新值）
+for (const ifs of Object.values(networkInterfaces()) ?? []) {
+  for (const i of ifs ?? []) {
+    if (i.family === 'IPv4' && !i.internal) {
+      console.log(`[dev] 手机/局域网访问: http://${i.address}:5173`);
+    }
+  }
+}
 up('server', 'npx', ['tsx', 'src/index.ts']);
 up('client', 'npx', ['vite', '--host', '0.0.0.0', '--port', '5173', '--strictPort']);
 
