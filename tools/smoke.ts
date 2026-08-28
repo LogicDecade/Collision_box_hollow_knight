@@ -5,7 +5,7 @@ import { Player } from '../packages/client/src/entities/player';
 import { Enemy } from '../packages/client/src/entities/enemies';
 import { Combat, Fighter } from '../packages/client/src/engine/hitbox';
 import { FEEL } from '../packages/client/src/engine/feel';
-import { ROOMS, roomLiveEnemies } from '../packages/client/src/world/rooms';
+import { ROOMS, roomLiveEnemies, doorsUnlockedByRoom } from '../packages/client/src/world/rooms';
 import { parseRoom, roomToJSON, roomToTS, snapRect, workingSetToEntryTS } from '../packages/client/src/editor/roomData';
 import { rectsOverlap, depenetrate } from '../packages/client/src/engine/rect';
 import { writeRoomsBlock, FENCE_START, FENCE_END } from '../packages/server/src/roomEditor';
@@ -289,6 +289,22 @@ console.log('== 16. 限制重生点位置：出生点嵌地形时被推出到合
   const inWall = { x: 1472 - 13, y: 531 - 21, w: 26, h: 42 };
   const out = depenetrate(inWall, cor.solids);
   check('完全嵌墙被推出到墙外', !cor.solids.some((s) => rectsOverlap(out, s)), JSON.stringify(out));
+}
+
+console.log('== 17. 通道门(清房解锁/双向同名) + 下劈反弹高度 ==');
+{
+  // 怪未清空 → 门不开
+  const none = doorsUnlockedByRoom(ROOMS.corridor, 'corridor', new Set());
+  check('怪未清空 → 通道门不开', none.length === 0, `doors=${none.join(',')}`);
+  // 清空本房间 → 解锁其带 door 的过渡（corridor→arena 的 arenaGate）
+  const all = new Set(ROOMS.corridor.enemies.map((_, i) => `corridor:${i}`));
+  const opened = doorsUnlockedByRoom(ROOMS.corridor, 'corridor', all);
+  check('怪清空 → 打通 corridor 侧门', opened.includes('arenaGate'), `doors=${opened.join(',')}`);
+  // 双侧同步：arena 清空同样解锁同一扇门
+  const arenaAll = new Set(ROOMS.arena.enemies.map((_, i) => `arena:${i}`));
+  check('双侧同名门同步解锁(arena侧)', doorsUnlockedByRoom(ROOMS.arena, 'arena', arenaAll).includes('arenaGate'), 'arenaGate');
+  // 下劈反弹高度 ≥ 点按跳跃
+  check('下劈反跳≥点按跳跃高度', FEEL.pogoBounce >= FEEL.jumpVel, `pogo=${FEEL.pogoBounce} jump=${FEEL.jumpVel}`);
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

@@ -8,7 +8,7 @@ import { Combat, Fighter } from '../engine/hitbox';
 import { rectsOverlap, depenetrate } from '../engine/rect';
 import { Player } from '../entities/player';
 import { Enemy } from '../entities/enemies';
-import { ROOMS, RoomDef, roomLiveEnemies, START_ROOM, START_SPAWN } from '../world/rooms';
+import { ROOMS, RoomDef, roomLiveEnemies, doorsUnlockedByRoom, START_ROOM, START_SPAWN } from '../world/rooms';
 import { loadSave, saveSave } from '../engine/save';
 import { showPause, hidePause } from '../ui/pause';
 import { isLoginOpen } from '../ui/login';
@@ -40,6 +40,9 @@ export class GameScene extends Phaser.Scene {
   private loaded = false;
   /** 已击杀敌人 key（房间id:定义索引）→ 存档持久化，重进房间不复活 */
   private killedEnemies = new Set<string>();
+  /** 已开放的通道门（door 名；房间小怪清空后解锁，双侧同名同时开放） */
+  private openDoors = new Set<string>();
+  private loginWasOpen = false;
   private enemyDefIndex = new Map<Enemy, number>();
 
   private roomLayer!: Phaser.GameObjects.Container;
@@ -109,6 +112,7 @@ export class GameScene extends Phaser.Scene {
       this.player.hp = save.hp;
       this.player.soul = save.soul;
       this.killedEnemies = new Set(save.killed ?? []);
+      this.openDoors = new Set(save.openDoors ?? []);
     }
     this.loadRoom(startRoom, startSpawn);
     this.loaded = true;
@@ -125,6 +129,7 @@ export class GameScene extends Phaser.Scene {
       player: this.player,
       game: this.game,
     };
+    this.loginWasOpen = isLoginOpen();
   }
 
   // ---------------- 房间加载 ----------------
@@ -162,6 +167,14 @@ export class GameScene extends Phaser.Scene {
     this.followTarget.y = this.player.y;
     this.roomLabel.setText(this.room.name);
     this.transitionCd = 0.6;
+    this.unlockDoorsForCurrentRoom();
+  }
+
+  /** 当前房间小怪清空 → 开放该房间所有标记 door 的通道（door 双侧同名统一开放） */
+  private unlockDoorsForCurrentRoom(): void {
+    for (const d of doorsUnlockedByRoom(this.room, this.roomId, this.killedEnemies)) {
+      this.openDoors.add(d);
+    }
   }
 
   /** 敌人出生点自动落到覆盖其横向跨度的最近地面（防初始嵌入后被碰撞轴向弹飞） */
@@ -202,9 +215,18 @@ export class GameScene extends Phaser.Scene {
       this.roomLayer.add(r);
     }
     for (const t of this.room.transitions) {
+      // door 通道：未开放(需清房)显示为铜橙色关闭态；开放后转青色 trigger
+      const locked = !!t.door && !this.openDoors.has(t.door);
       const r = this.add
-        .rectangle(t.rect.x + t.rect.w / 2, t.rect.y + t.rect.h / 2, t.rect.w, t.rect.h, COLORS.trigger, 0.16)
-        .setStrokeStyle(1, COLORS.trigger, 0.5);
+        .rectangle(
+          t.rect.x + t.rect.w / 2,
+          t.rect.y + t.rect.h / 2,
+          t.rect.w,
+          t.rect.h,
+          locked ? COLORS.lock : COLORS.trigger,
+          locked ? 0.32 : 0.16,
+        )
+        .setStrokeStyle(1, locked ? COLORS.lock : COLORS.trigger, locked ? 0.9 : 0.5);
       this.roomLayer.add(r);
     }
   }
@@ -288,6 +310,7 @@ export class GameScene extends Phaser.Scene {
       room: this.roomId,
       spawn: this.currentSpawnName,
       killed: [...this.killedEnemies],
+      openDoors: [...this.openDoors],
     });
   }
 
@@ -316,6 +339,15 @@ export class GameScene extends Phaser.Scene {
     // 登录/注册打开时冻结世界：停止战斗系统(玩家/敌人/结算/输入全停)，只维持渲染
     // 输入在登录期间置 disabled（不捕获、不 preventDefault，保证登录框正常打字）
     this.inputManager.enabled = !isLoginOpen();
+
+    // 登录完成（登录层刚关闭）→ 新一局：小怪刷新（已打开的通道门保持开放）
+    if (this.loginWasOpen && !isLoginOpen()) {
+      this.loginWasOpen = false;
+      this.killedEnemies.clear();
+      this.loadRoom(this.roomId, this.currentSpawnName);
+    }
+    this.loginWasOpen = isLoginOpen();
+
     if (isLoginOpen()) {
       this.inputManager.reset(); // 防登录期间按键残留到游戏开始
       this.drawHud();
@@ -369,6 +401,7 @@ export class GameScene extends Phaser.Scene {
     this.combat.update(dt, fighters);
 
     // 敌人死亡 → 写入击杀记录（跨房间往返不再复活）
+    let anyKilled = false;
     for (const e of this.enemies) {
       if (!e.alive) {
         const idx = this.enemyDefIndex.get(e);
@@ -376,11 +409,14 @@ export class GameScene extends Phaser.Scene {
           const key = `${this.roomId}:${idx}`;
           if (!this.killedEnemies.has(key)) {
             this.killedEnemies.add(key);
-            this.save();
+            anyKilled = true;
           }
         }
       }
     }
+    // 本房间小怪清空 → 解锁该房间的通道门
+    if (anyKilled) this.unlockDoorsForCurrentRoom();
+    if (anyKilled) this.save();
 
     // 敌人接触伤害
     if (this.player.invulnT <= 0) {
@@ -400,9 +436,10 @@ export class GameScene extends Phaser.Scene {
       this.player.takeHit({ damage: 99, knockX: 0, knockY: 0 }, 1);
     }
 
-    // 房间过渡
+    // 房间过渡（door 通道需本房间小怪清空解锁后才可通行）
     if (this.transitionCd <= 0) {
       for (const t of this.room.transitions) {
+        if (t.door && !this.openDoors.has(t.door)) continue;
         if (rectsOverlap(this.player.rect(), t.rect)) {
           this.loadRoom(t.to, t.spawn);
           break;
@@ -483,6 +520,7 @@ export class GameScene extends Phaser.Scene {
   /** 重新开始：清空击杀记录(小怪全部复活)、血魂回满，从第一间出生点重新开始并重置存档 */
   private resetRun(): void {
     this.killedEnemies.clear();
+    this.openDoors.clear(); // 通道门回到初始关闭（需重新清房解锁）
     this.fadeRect.setAlpha(0);
     this.tweens.add({
       targets: this.fadeRect,

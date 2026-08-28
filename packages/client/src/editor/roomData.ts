@@ -70,7 +70,7 @@ function roomObjBody(room: RoomDef): string {
     `    transitions: [`,
     line(
       room.transitions.map(
-        (t) => `{ rect: ${fmtRect(t.rect)}, to:${JSON.stringify(t.to)}, spawn:${JSON.stringify(t.spawn)} }`,
+        (t) => `{ rect: ${fmtRect(t.rect)}, to:${JSON.stringify(t.to)}, spawn:${JSON.stringify(t.spawn)}${t.door ? `, door:${JSON.stringify(t.door)}` : ''} }`,
       ),
     ),
     `    ],`,

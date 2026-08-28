@@ -6,6 +6,8 @@ export interface SaveData {
   spawn: string;
   /** 已击杀敌人 key 列表（`房间id:定义索引`），跨房间往返不复活 */
   killed?: string[];
+  /** 已开放的通道门（door 名；由房间小怪清空触发解锁，双侧同名同时开放） */
+  openDoors?: string[];
 }
 
 const KEY = 'cb_save';
@@ -17,6 +19,7 @@ export function loadSave(): SaveData | null {
     const d = JSON.parse(raw) as SaveData;
     if (typeof d.hp !== 'number' || typeof d.soul !== 'number') return null;
     if (!Array.isArray(d.killed)) d.killed = [];
+    if (!Array.isArray(d.openDoors)) d.openDoors = [];
     return d;
   } catch {
     return null;

@@ -13,6 +13,7 @@ export const COLORS = {
   enemyLine: 0x9c3b24,
   boss: 0xd4a5f0,
   trigger: 0x3a5a7a,
+  lock: 0x9a5a3a,
   soulOrb: 0x4da6ff,
   soulBar: 0x2f7fd1,
   hpFull: 0xd8d8d2,

@@ -36,7 +36,8 @@ export const FEEL = {
   upSlashHop: 180,
   downSlashBox: { w: 54, h: 62 },
   downSlashOffsetY: 36,
-  pogoBounce: 360,
+  // 下劈踏击反弹：至少达到点按跳跃高度(jumpVel 710)，连踏可越攀越高
+  pogoBounce: 720,
 
   // 灵魂
   soulMax: 100,

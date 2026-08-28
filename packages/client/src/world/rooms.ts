@@ -12,6 +12,8 @@ export interface TransitionDef {
   rect: Rect;
   to: string;
   spawn: string;
+  /** 通道门：有值=需本房间小怪清空后开放；双侧(双方过渡)用同一个 door 名 → 同时开/关 */
+  door?: string;
 }
 
 export interface EnemyDef {
@@ -95,7 +97,7 @@ export interface RoomDef {
       ],
       transitions: [
       { rect: { x:0, y:460, w:46, h:120 }, to:"hub", spawn:"fromCorridor" },
-      { rect: { x:1440, y:440, w:60, h:140 }, to:"arena", spawn:"fromCorridor" }
+      { rect: { x:1440, y:440, w:60, h:140 }, to:"arena", spawn:"fromCorridor", door:"arenaGate" }
       ],
       enemies: [
       { kind:"crawler", x:260, y:548 },
@@ -131,7 +133,7 @@ export interface RoomDef {
       { name:"spawn1", x:528, y:72 }
       ],
       transitions: [
-      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena" },
+      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena", door:"arenaGate" },
       { rect: { x:510, y:-60, w:48, h:96 }, to:"hub", spawn:"enter" }
       ],
       enemies: [
@@ -188,4 +190,16 @@ export function roomLiveEnemies(
     if (!killed.has(`${roomId}:${i}`)) out.push({ def, idx: i });
   });
   return out;
+}
+
+/** 本房间小怪清空 → 应解锁的通道门列表（未清空则一个不开）。door 双侧同名 → 同时开/关 */
+export function doorsUnlockedByRoom(
+  room: RoomDef,
+  roomId: string,
+  killed: ReadonlySet<string>,
+): string[] {
+  if (roomLiveEnemies(roomId, room.enemies, killed).length > 0) return [];
+  const doors = new Set<string>();
+  for (const t of room.transitions) if (t.door) doors.add(t.door);
+  return [...doors];
 }
