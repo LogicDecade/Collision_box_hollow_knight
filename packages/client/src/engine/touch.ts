@@ -11,12 +11,18 @@ const CSS = `
 .cb-touch-axis { position: absolute; pointer-events: none; display: none; }
 .cb-axis-h { left: 0; right: 0; top: 50%; height: 1px; background: rgba(114,201,242,0.18); }
 .cb-axis-v { top: 0; bottom: 0; left: 50%; width: 1px; background: rgba(114,201,242,0.18); }
-.cb-touch-btns { position: absolute; right: 16px; bottom: calc(30px + env(safe-area-inset-bottom)); display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 14px; }
-.cb-touch-key { width: 76px; height: 76px; border-radius: 50%; border: 1.5px solid rgba(216,216,210,0.4); background: rgba(28,28,24,0.5); color: #d8d8d2; font-size: 15px; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; touch-action: none; -webkit-touch-callout: none; }
+.cb-touch-btns { position: absolute; right: 16px; right: max(16px, env(safe-area-inset-right)); bottom: 30px; bottom: max(30px, env(safe-area-inset-bottom)); display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 14px; max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); }
+.cb-touch-key { width: 76px; height: 76px; border-radius: 50%; border: 1.5px solid rgba(216,216,210,0.4); background: rgba(28,28,24,0.5); color: #d8d8d2; font-size: 15px; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; touch-action: none; -webkit-touch-callout: none; flex: 0 0 auto; }
 .cb-touch-key:active { background: rgba(114,201,242,0.28); border-color: #72c9f2; }
 .cb-touch-key.cb-key-heal { background: rgba(224,107,79,0.22); border-color: rgba(224,107,79,0.5); color: #ffc9bd; }
-.cb-touch-pause { position: absolute; right: 16px; top: max(16px, env(safe-area-inset-top)); width: 46px; height: 46px; font-size: 14px; border-radius: 8px; }
+.cb-touch-pause { position: absolute; right: 16px; right: max(16px, env(safe-area-inset-right)); top: 16px; top: max(16px, env(safe-area-inset-top)); width: 46px; height: 46px; font-size: 14px; border-radius: 8px; }
 .cb-rotate { position: fixed; inset: 0; z-index: 850; display: none; align-items: center; justify-content: center; background: rgba(18,18,15,0.97); color: #d8d8d2; font-size: 16px; letter-spacing: 0.08em; text-align: center; padding: 32px; font-family: system-ui, sans-serif; }
+/* 横屏矮屏（Safari 地址栏/工具栏可能占位较多）时收紧按钮，既不超出顶边也不贴底被遮 */
+@media (max-height: 480px) and (orientation: landscape) {
+  .cb-touch-btns { gap: 10px; right: 12px; right: max(12px, env(safe-area-inset-right)); bottom: 18px; bottom: max(18px, env(safe-area-inset-bottom)); }
+  .cb-touch-key { width: 62px; height: 62px; font-size: 13px; }
+  .cb-touch-pause { width: 40px; height: 40px; font-size: 12px; top: 12px; top: max(12px, env(safe-area-inset-top)); right: 12px; right: max(12px, env(safe-area-inset-right)); }
+}
 `;
 
 /** 仅“主要输入是指针(coarse)=手机/平板”或至少支持触摸时才启用触屏控件 */
