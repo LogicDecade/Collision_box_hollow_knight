@@ -1,21 +1,7 @@
 // 登录 / 注册 · 纯 DOM 覆盖层（保持留白风格，与游戏引擎解耦）
-import type Phaser from 'phaser';
 import { apiLogin, apiRegister, setToken } from '../net/api';
 
 let overlay: HTMLElement | null = null;
-
-/**
- * 登录期间禁用 Phaser 键盘管理器：否则它会捕获 C/Z/X 等战斗键并 preventDefault，
- * 导致输入框里打不出这些字母。关层后恢复。
- */
-function setGameKeyboard(enabled: boolean): void {
-  try {
-    const kb = (window as unknown as { __cb?: { game: Phaser.Game } }).__cb?.game?.input?.keyboard;
-    if (kb) kb.enabled = enabled;
-  } catch {
-    /* 竞态/无键盘管理器时忽略 */
-  }
-}
 
 const CSS_ID = 'cb-login-css';
 const CSS = `
@@ -170,12 +156,10 @@ function build(): void {
 export function showLogin(): void {
   if (!overlay) build();
   overlay!.style.display = 'flex';
-  setGameKeyboard(false);
 }
 
 export function hideLogin(): void {
   if (overlay) overlay.style.display = 'none';
-  setGameKeyboard(true);
 }
 
 export function isLoginOpen(): boolean {

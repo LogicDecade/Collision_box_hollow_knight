@@ -51,7 +51,7 @@ export interface RoomDef {
       { x:1152, y:168, w:408, h:24 }
       ],
       spawns: [
-      { name:"enter", x:260, y:618 },
+      { name:"enter", x:90, y:618 },
       { name:"fromCorridor", x:1500, y:618 }
       ],
       transitions: [
@@ -91,7 +91,7 @@ export interface RoomDef {
       ],
       spawns: [
       { name:"fromHub", x:120, y:538 },
-      { name:"fromArena", x:1380, y:538 }
+      { name:"fromArena", x:1402, y:538 }
       ],
       transitions: [
       { rect: { x:0, y:460, w:46, h:120 }, to:"hub", spawn:"fromCorridor" },
@@ -120,20 +120,27 @@ export interface RoomDef {
       { x:816, y:336, w:96, h:24 },
       { x:912, y:504, w:48, h:168 },
       { x:1128, y:432, w:24, h:48 },
-      { x:1272, y:456, w:72, h:24 }
+      { x:1272, y:456, w:72, h:24 },
+      { x:936, y:216, w:96, h:24 },
+      { x:840, y:192, w:24, h:24 },
+      { x:672, y:168, w:96, h:24 },
+      { x:408, y:96, w:240, h:24 }
       ],
       spawns: [
-      { name:"fromCorridor", x:140, y:638 }
+      { name:"fromCorridor", x:140, y:638 },
+      { name:"spawn1", x:528, y:72 }
       ],
       transitions: [
-      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena" }
+      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena" },
+      { rect: { x:510, y:-60, w:48, h:96 }, to:"hub", spawn:"enter" }
       ],
       enemies: [
       { kind:"walker", x:1320, y:648 },
       { kind:"crawler", x:720, y:648 },
       { kind:"crawler", x:1040, y:648 },
       { kind:"crawler", x:984, y:432 },
-      { kind:"walker", x:1056, y:456 }
+      { kind:"walker", x:1056, y:456 },
+      { kind:"crawler", x:852, y:168 }
       ],
   };
   // room1 · id="room1"（由碰撞箱地图编辑器生成）
@@ -147,6 +154,7 @@ export interface RoomDef {
       spawns: [
       ],
       transitions: [
+      { rect: { x:384, y:700, w:48, h:96 }, to:"hub", spawn:"enter" }
       ],
       enemies: [
       ],

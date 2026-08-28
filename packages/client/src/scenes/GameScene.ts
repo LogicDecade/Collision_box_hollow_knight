@@ -60,7 +60,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
-    this.inputManager = new Input(this);
+    this.inputManager = new Input();
     if (isTouchDevice()) {
       this.touch = new TouchControls();
       this.touch.attach();
@@ -314,7 +314,10 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta / 1000, 1 / 30);
 
     // 登录/注册打开时冻结世界：停止战斗系统(玩家/敌人/结算/输入全停)，只维持渲染
+    // 输入在登录期间置 disabled（不捕获、不 preventDefault，保证登录框正常打字）
+    this.inputManager.enabled = !isLoginOpen();
     if (isLoginOpen()) {
+      this.inputManager.reset(); // 防登录期间按键残留到游戏开始
       this.drawHud();
       this.renderAll(dt);
       return;
@@ -465,10 +468,12 @@ export class GameScene extends Phaser.Scene {
     showPause(
       () => {
         hidePause();
+        this.inputManager.reset(); // 清掉暂停期间残留的按键(含 Esc)
         this.scene.resume();
       },
       () => {
         hidePause();
+        this.inputManager.reset();
         this.scene.resume();
         this.resetRun();
       },
