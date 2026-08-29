@@ -305,6 +305,14 @@ console.log('== 17. 通道门(清房解锁/双向同名) + 下劈反弹高度 ==
   check('双侧同名门同步解锁(arena侧)', doorsUnlockedByRoom(ROOMS.arena, 'arena', arenaAll).includes('arenaGate'), 'arenaGate');
   // 下劈反弹高度 ≥ 点按跳跃
   check('下劈反跳≥点按跳跃高度', FEEL.pogoBounce >= FEEL.jumpVel, `pogo=${FEEL.pogoBounce} jump=${FEEL.jumpVel}`);
+  // 编辑器序列化/解析往返保留 door（保存到工程不丢门数据）
+  const withDoor: RoomDef = {
+    id: 'doorroom', name: '门房间', w: 1000, h: 600, solids: [], spawns: [],
+    transitions: [{ rect: { x: 0, y: 0, w: 48, h: 96 }, to: 'y', spawn: 's', door: 'g1' }],
+    enemies: [],
+  };
+  check('TS 序列化保留 door', /door:"g1"/.test(roomToTS(withDoor)), 'door in TS');
+  check('JSON 往返保留 door', (parseRoom(roomToJSON(withDoor))?.transitions[0]?.door ?? '') === 'g1', 'door roundtrip');
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

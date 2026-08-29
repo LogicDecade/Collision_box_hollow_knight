@@ -27,6 +27,7 @@ const COL = {
   solidSel: 0x72c9f2,
   spawn: 0x4da6ff,
   transition: 0x6a86a8,
+  lock: 0x9a5a3a,
   enemy: 0xe06b4f,
   text: 0x9a9a92,
 };
@@ -199,22 +200,24 @@ class EditorScene extends Phaser.Scene {
       g.fillRect(sp.x - 18, sp.y - 30, 90, 14);
       this.label(sp.x - 16, sp.y - 28, `${sp.name}`, '#4da6ff');
     });
-    // 过渡
+    // 通道(过渡)：带 door=需清房解锁的锁门，显示铜橙色
     this.room.transitions.forEach((t, i) => {
       const sel = this.selected?.kind === 'transition' && this.selected.idx === i;
-      g.fillStyle(COL.transition, sel ? 0.4 : 0.18);
+      const c = t.door ? COL.lock : COL.transition;
+      g.fillStyle(c, sel ? 0.4 : 0.18);
       g.fillRect(t.rect.x, t.rect.y, t.rect.w, t.rect.h);
-      g.lineStyle(1, sel ? COL.solidSel : COL.transition, 1);
+      g.lineStyle(1, sel ? COL.solidSel : c, 1);
       g.strokeRect(t.rect.x, t.rect.y, t.rect.w, t.rect.h);
-      // 斜纹
-      g.lineStyle(1, COL.transition, 0.5);
+      // 斜纹（锁门更密）
+      g.lineStyle(1, c, 0.5);
       const d = Math.max(t.rect.w, t.rect.h);
-      for (let k = -d; k < d; k += 12) {
+      const step = t.door ? 7 : 12;
+      for (let k = -d; k < d; k += step) {
         g.lineBetween(t.rect.x + k, t.rect.y + t.rect.h, t.rect.x + k + t.rect.h, t.rect.y);
       }
       g.fillStyle(0x0, 0.75);
       g.fillRect(t.rect.x, t.rect.y - 16, 150, 14);
-      this.label(t.rect.x + 3, t.rect.y - 15, `→ ${t.to}@${t.spawn}`, '#cfcfc8');
+      this.label(t.rect.x + 3, t.rect.y - 15, `→ ${t.to}@${t.spawn}${t.door ? ' 🔒' : ''}`, '#cfcfc8');
     });
     // 敌人
     this.room.enemies.forEach((e, i) => {
@@ -438,8 +441,8 @@ class EditorScene extends Phaser.Scene {
         <section><h3>工具</h3>
           <div class="cb-tools" data-act="tool:bar"></div>
           <label class="cb-row"><span>敌人类型</span><select data-act="enemy:kind"><option value="crawler">crawler</option><option value="walker">walker</option></select></label>
-          <label class="cb-row"><span>过渡→目标</span><select data-act="trans:to"></select></label>
-          <label class="cb-row"><span>过渡→出生点</span><input data-act="trans:spawn" type="text"></label>
+          <label class="cb-row"><span>通道→目标</span><select data-act="trans:to"></select></label>
+          <label class="cb-row"><span>通道→出生点</span><input data-act="trans:spawn" type="text"></label>
           <label class="cb-row"><input data-act="opt:snap" type="checkbox" checked> 网格吸附</label>
           <label class="cb-row"><input data-act="opt:grid" type="checkbox" checked> 显示网格</label>
         </section>
@@ -595,6 +598,9 @@ class EditorScene extends Phaser.Scene {
       this.room.transitions[idx].to = el.value.trim();
     } else if (act === 'obj:set-spawnname' && s.kind === 'transition') {
       this.room.transitions[idx].spawn = el.value.trim();
+    } else if (act === 'obj:set-door' && s.kind === 'transition') {
+      // 门名：空 = 开放；有值 = 本房间清怪后开放（两侧同名同时开/关）
+      this.room.transitions[idx].door = el.value.trim() || undefined;
     } else if (act === 'obj:set-kind' && s.kind === 'enemy') {
       this.room.enemies[idx].kind = el.value as 'crawler' | 'walker';
     } else {
@@ -650,7 +656,7 @@ class EditorScene extends Phaser.Scene {
       { id: 'select', label: '选择' },
       { id: 'solid', label: '地形' },
       { id: 'spawn', label: '出生点' },
-      { id: 'transition', label: '过渡' },
+      { id: 'transition', label: '通道' },
       { id: 'enemy', label: '敌人' },
     ];
     toolBar.innerHTML = tools
@@ -690,7 +696,7 @@ class EditorScene extends Phaser.Scene {
     } else if (s.kind === 'transition') {
       const tr = this.room.transitions[s.idx];
       if (!tr) { objPanel.textContent = '（已删除）'; return; }
-      objPanel.innerHTML = `<div class="cb-objtitle">过渡</div>${n('x', 'x', tr.rect.x)}${n('y', 'y', tr.rect.y)}${n('宽', 'w', tr.rect.w)}${n('高', 'h', tr.rect.h)}${t('目标房间', 'to', tr.to)}${t('出生点', 'spawnname', tr.spawn)}`;
+      objPanel.innerHTML = `<div class="cb-objtitle">通道${tr.door ? ' · 🔒 锁定' : ' · 开放'}</div>${n('x', 'x', tr.rect.x)}${n('y', 'y', tr.rect.y)}${n('宽', 'w', tr.rect.w)}${n('高', 'h', tr.rect.h)}${t('目标房间', 'to', tr.to)}${t('出生点', 'spawnname', tr.spawn)}${t('门名(空=开放)', 'door', tr.door ?? '')}<p class="cb-hint">填上门名即「关门」——本房间小怪清空后开放；两侧通道填<b>相同门名</b>即双侧同开/同锁。</p>`;
     } else {
       const e = this.room.enemies[s.idx];
       if (!e) { objPanel.textContent = '（已删除）'; return; }
