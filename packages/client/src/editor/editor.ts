@@ -14,6 +14,7 @@ import {
   snapRect,
 } from './roomData';
 import { getToken, setToken, saveRoomsToProject } from './save';
+import { FEEL, loadFeelOverrides, saveFeelOverrides, clearFeelOverrides, applyFeelOverrides } from '../engine/feel';
 // 需逃逸的文本值（房间名等）
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -33,6 +34,29 @@ const COL = {
 };
 
 type Tool = 'select' | 'solid' | 'spawn' | 'transition' | 'enemy';
+
+/**
+ * 角色参数编辑分组（点路径 key：'attackBox.w' 代表嵌套对象字段）。
+ * 后续追加「技能」等新分组直接往这里加 { name, rows } 即可。
+ */
+const FEEL_GROUPS: { name: string; rows: Array<[string, string]> }[] = [
+  { name: '角色体积', rows: [['playerW', '宽'], ['playerH', '高']] },
+  { name: '移动', rows: [['runSpeed', '跑速'], ['accel', '加速'], ['friction', '摩擦'], ['airControl', '空中操控']] },
+  { name: '跳跃', rows: [['gravity', '重力'], ['jumpVel', '起跳速度'], ['jumpCutMult', '松键切短'], ['fallGravityMult', '下落倍率'], ['maxFall', '最大下落'], ['coyote', '土狼时间'], ['jumpBuffer', '预输入']] },
+  { name: '贴墙', rows: [['wallSlideMax', '下滑限速'], ['wallJumpX', '墙跳·横向'], ['wallJumpY', '墙跳·纵向']] },
+  { name: '攻击', rows: [['attackCd', '冷却'], ['attackHitWindow', '命中窗口'], ['attackBox.w', '平砍·宽'], ['attackBox.h', '平砍·高'], ['attackOffsetX', '平砍·前伸'], ['upSlashBox.w', '上劈·宽'], ['upSlashBox.h', '上劈·高'], ['upSlashOffsetY', '上劈·偏移'], ['upSlashHop', '上劈·上跃'], ['downSlashBox.w', '下劈·宽'], ['downSlashBox.h', '下劈·高'], ['downSlashOffsetY', '下劈·偏移']] },
+  { name: '下劈反跳', rows: [['pogoBounce', '反跳速度']] },
+  { name: '灵魂', rows: [['soulMax', '上限'], ['soulPerHit', '每击获得'], ['healCost', '回血消耗'], ['healChannel', '吟唱时长']] },
+  { name: '受击 / 生命', rows: [['hurtInvuln', '无敌时长'], ['knockX', '击退·X'], ['knockY', '击退·Y'], ['maxHp', '生命上限']] },
+];
+
+/** 读取 FEEL 里的值（支持点路径 'attackBox.w'） */
+function feelGet(path: string): number {
+  const parts = path.split('.');
+  let v: unknown = FEEL;
+  for (const p of parts) v = (v as Record<string, unknown>)[p];
+  return typeof v === 'number' ? v : 0;
+}
 
 interface WorkingSet {
   rooms: Record<string, RoomDef>;
@@ -64,6 +88,8 @@ class EditorScene extends Phaser.Scene {
   private room!: RoomDef;
 
   private tool: Tool = 'select';
+  /** 角色参数草稿（点路径 key → 用户输入值，未改则为当前生效值） */
+  private feelDraft = new Map<string, number>();
   private selected: ObjRef | null = null;
   private snapOn = true;
   private showGrid = true;
@@ -85,6 +111,8 @@ class EditorScene extends Phaser.Scene {
   }
 
   create(): void {
+    // 编辑器也应用已保存的角色覆盖，让面板显示「当前生效手感」
+    applyFeelOverrides(loadFeelOverrides() ?? {});
     this.set = loadSet();
     this.room = this.set.rooms[this.set.current] ?? Object.values(this.set.rooms)[0];
 
@@ -256,10 +284,14 @@ class EditorScene extends Phaser.Scene {
     });
     this.input.on(
       'wheel',
-      (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+      (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+        // 以鼠标指针为焦点缩放：缩放前后保持指针下的世界点不动
         const cam = this.cameras.main;
-        const z = Phaser.Math.Clamp(cam.zoom * (dy > 0 ? 1.1 : 0.9), 0.25, 3);
-        cam.setZoom(z);
+        const z2 = Phaser.Math.Clamp(cam.zoom * (dy > 0 ? 1.1 : 0.9), 0.25, 3);
+        const m = cam.getWorldPoint(p.x, p.y);
+        cam.setZoom(z2);
+        cam.scrollX = m.x - p.x / z2;
+        cam.scrollY = m.y - p.y / z2;
       },
     );
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
@@ -438,6 +470,14 @@ class EditorScene extends Phaser.Scene {
           <label>名称 <input data-act="room:name" type="text"></label>
           <label>宽 <input data-act="room:w" type="number" step="48"> 高 <input data-act="room:h" type="number" step="48"></label>
         </section>
+        <section><h3>角色参数 · 试玩生效</h3>
+          <div data-act="feel:panel"></div>
+          <div class="cb-row buttons" style="margin-top:8px">
+            <button data-act="feel:apply">应用到试玩</button>
+            <button data-act="feel:reset">恢复默认</button>
+          </div>
+          <p class="cb-hint">改完点「应用到试玩」存本地，打开游戏页立即按新参数运行（% 会在下次编辑重载）。</p>
+        </section>
         <section><h3>工具</h3>
           <div class="cb-tools" data-act="tool:bar"></div>
           <label class="cb-row"><span>敌人类型</span><select data-act="enemy:kind"><option value="crawler">crawler</option><option value="walker">walker</option></select></label>
@@ -493,6 +533,11 @@ class EditorScene extends Phaser.Scene {
       this.transTo = val;
     } else if (act === 'save:token') {
       setToken(val);
+    } else if (act.startsWith('cf:')) {
+      // 角色参数输入（data-cf 点路径）
+      const path = el.getAttribute('data-cf')!;
+      const n = Number(val);
+      if (Number.isFinite(n)) this.feelDraft.set(path, n);
     } else if (act.startsWith('obj:set-')) {
       // 对象字段编辑（change 时记录一次历史）
       if (this.selected) this.pushHistory();
@@ -566,6 +611,25 @@ class EditorScene extends Phaser.Scene {
         btn.disabled = false;
         this.flash(st.ok ? `✔ ${st.msg}` : `✘ ${st.msg}`);
       });
+    } else if (act === 'feel:apply') {
+      // 固化全部面板字段（draft 优先）为 override 写入 localStorage
+      const out: Record<string, unknown> = {};
+      for (const g of FEEL_GROUPS) {
+        for (const [path] of g.rows) {
+          const v = this.feelDraft.get(path) ?? feelGet(path);
+          const parts = path.split('.');
+          if (parts.length === 1) out[parts[0]] = v;
+          else {
+            const obj = (out[parts[0]] ??= {}) as Record<string, unknown>;
+            obj[parts[1]] = v;
+          }
+        }
+      }
+      saveFeelOverrides(out);
+      this.flash('✔ 角色参数已应用到本地试玩（打开游戏页生效）');
+    } else if (act === 'feel:reset') {
+      clearFeelOverrides();
+      location.reload(); // 重载让 FEEL 恢复默认并重新渲染面板
     } else if (act === 'nav:home') {
       location.href = '/';
     }
@@ -642,6 +706,7 @@ class EditorScene extends Phaser.Scene {
     const snapChk = panel.querySelector<HTMLInputElement>('[data-act="opt:snap"]')!;
     const gridChk = panel.querySelector<HTMLInputElement>('[data-act="opt:grid"]')!;
     const enKindSel = panel.querySelector<HTMLSelectElement>('[data-act="enemy:kind"]')!;
+    const feelPanel = panel.querySelector<HTMLElement>('[data-act="feel:panel"]')!;
 
     // 房间下拉
     roomSel.innerHTML = Object.values(this.set.rooms)
@@ -670,6 +735,7 @@ class EditorScene extends Phaser.Scene {
       .join('');
     transSpawn.value = this.transSpawn;
     enKindSel.value = this.enemyKind;
+    this.renderFeelPanel(feelPanel);
     snapChk.checked = this.snapOn;
     gridChk.checked = this.showGrid;
     const tokenInp = panel.querySelector<HTMLInputElement>('[data-act="save:token"]');
@@ -705,6 +771,19 @@ class EditorScene extends Phaser.Scene {
       }${n('x', 'x', e.x)}${n('y', 'y', e.y)}`;
     }
     objPanel.innerHTML += `<button data-act="obj:del" class="cb-danger">删除选中</button>`;
+  }
+
+  /** 角色参数面板：按组渲染数值输入（后续「技能」组自动出现） */
+  private renderFeelPanel(host: HTMLElement): void {
+    host.innerHTML = FEEL_GROUPS.map((g) => {
+      const rows = g.rows
+        .map(([path, label]) => {
+          const v = this.feelDraft.get(path) ?? feelGet(path);
+          return `<label class="cb-row"><span>${label}</span><input data-act="cf:set" data-cf="${path}" type="number" value="${v}"></label>`;
+        })
+        .join('');
+      return `<div class="cb-objtitle">${g.name}</div>${rows}`;
+    }).join('');
   }
 
   private flash(msg: string): void {

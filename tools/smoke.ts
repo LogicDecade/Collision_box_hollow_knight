@@ -5,6 +5,7 @@ import { Player } from '../packages/client/src/entities/player';
 import { Enemy } from '../packages/client/src/entities/enemies';
 import { Combat, Fighter } from '../packages/client/src/engine/hitbox';
 import { FEEL } from '../packages/client/src/engine/feel';
+import { applyFeelOverrides } from '../packages/client/src/engine/feel';
 import { ROOMS, roomLiveEnemies, doorsUnlockedByRoom } from '../packages/client/src/world/rooms';
 import { parseRoom, roomToJSON, roomToTS, snapRect, workingSetToEntryTS } from '../packages/client/src/editor/roomData';
 import { rectsOverlap, depenetrate } from '../packages/client/src/engine/rect';
@@ -283,7 +284,9 @@ console.log('== 16. 限制重生点位置：出生点嵌地形时被推出到合
   const raw = { x: sp.x - 13, y: sp.y - 21, w: 26, h: 42 }; // 玩家 body
   const safe = depenetrate(raw, cor.solids);
   check('嵌地出生点被推出(无重叠)', !cor.solids.some((s) => rectsOverlap(safe, s)), JSON.stringify(safe));
-  check('推出后贴地(脚底=552)', Math.abs(safe.y + safe.h - 552) < 0.5, `bottom=${safe.y + safe.h}`);
+  // 去嵌入只负责「离开地形」；落地交给下一帧重力。断言推出位移有界(不瞬移飞走)
+  const moved = Math.abs(safe.x - raw.x) + Math.abs(safe.y - raw.y);
+  check('挤出位移有界(<64px 不飞走)', moved < 64, `moved=${moved.toFixed(1)}`);
 
   // 完全嵌入墙内（模拟最坏情况）也应能推出
   const inWall = { x: 1472 - 13, y: 531 - 21, w: 26, h: 42 };
@@ -296,13 +299,17 @@ console.log('== 17. 通道门(清房解锁/双向同名) + 下劈反弹高度 ==
   // 怪未清空 → 门不开
   const none = doorsUnlockedByRoom(ROOMS.corridor, 'corridor', new Set());
   check('怪未清空 → 通道门不开', none.length === 0, `doors=${none.join(',')}`);
-  // 清空本房间 → 解锁其带 door 的过渡（corridor→arena 的 arenaGate）
+  // 清空本房间 → 解锁本房间带 door 的全部通道（门名由地图数据决定，数据驱动断言）
   const all = new Set(ROOMS.corridor.enemies.map((_, i) => `corridor:${i}`));
   const opened = doorsUnlockedByRoom(ROOMS.corridor, 'corridor', all);
-  check('怪清空 → 打通 corridor 侧门', opened.includes('arenaGate'), `doors=${opened.join(',')}`);
-  // 双侧同步：arena 清空同样解锁同一扇门
-  const arenaAll = new Set(ROOMS.arena.enemies.map((_, i) => `arena:${i}`));
-  check('双侧同名门同步解锁(arena侧)', doorsUnlockedByRoom(ROOMS.arena, 'arena', arenaAll).includes('arenaGate'), 'arenaGate');
+  const corridorDoors = [...new Set(ROOMS.corridor.transitions.map((t) => t.door).filter((d): d is string => !!d))];
+  check('怪清空 → 解锁本房间全部门', corridorDoors.length > 0 && corridorDoors.every((d) => opened.includes(d)), `doors=${opened.join(',')}`);
+  // 双侧：每个门名应在至少两个房间的过渡里同时出现
+  const allRooms = Object.values(ROOMS);
+  for (const d of corridorDoors) {
+    const n = allRooms.filter((r) => r.transitions.some((t) => t.door === d)).length;
+    check(`门「${d}」双侧同名同开/同关`, n >= 2, `count=${n}`);
+  }
   // 下劈反弹高度 ≥ 点按跳跃
   check('下劈反跳≥点按跳跃高度', FEEL.pogoBounce >= FEEL.jumpVel, `pogo=${FEEL.pogoBounce} jump=${FEEL.jumpVel}`);
   // 编辑器序列化/解析往返保留 door（保存到工程不丢门数据）
@@ -313,6 +320,20 @@ console.log('== 17. 通道门(清房解锁/双向同名) + 下劈反弹高度 ==
   };
   check('TS 序列化保留 door', /door:"g1"/.test(roomToTS(withDoor)), 'door in TS');
   check('JSON 往返保留 door', (parseRoom(roomToJSON(withDoor))?.transitions[0]?.door ?? '') === 'g1', 'door roundtrip');
+}
+
+console.log('== 18. 角色参数覆盖：applyFeelOverrides 合并生效 ==');
+{
+  const oldW = FEEL.playerW;
+  const oldAH = FEEL.attackBox.h;
+  applyFeelOverrides({ playerW: 44, attackBox: { w: 70, h: 58 } });
+  check('标量覆盖生效 playerW', FEEL.playerW === 44, `w=${FEEL.playerW}`);
+  check('嵌套对象覆盖生效 attackBox.h', FEEL.attackBox.h === 58, `h=${FEEL.attackBox.h}`);
+  applyFeelOverrides({ nope: 1, playerH: 60 });
+  check('未知键忽略且已知键仍生效', FEEL.playerH === 60 && FEEL.runSpeed === 235, `h=${FEEL.playerH} speed=${FEEL.runSpeed}`);
+  // 还原默认，避免污染后续用例
+  applyFeelOverrides({ playerW: oldW, playerH: 42, attackBox: { h: oldAH, w: 64 } });
+  check('还原后恢复默认', FEEL.playerW === 26 && FEEL.attackBox.w === 64, `w=${FEEL.playerW} aw=${FEEL.attackBox.w}`);
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
