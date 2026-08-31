@@ -117,22 +117,28 @@ export interface RoomDef {
       { x:816, y:552, w:96, h:24 },
       { x:912, y:480, w:240, h:24 },
       { x:1392, y:552, w:120, h:24 },
-      { x:600, y:456, w:120, h:24 },
+      { x:648, y:480, w:96, h:24 },
       { x:408, y:360, w:96, h:24 },
-      { x:816, y:336, w:96, h:24 },
+      { x:792, y:384, w:72, h:24 },
       { x:912, y:504, w:48, h:168 },
       { x:1128, y:432, w:24, h:48 },
       { x:1272, y:456, w:72, h:24 },
-      { x:936, y:216, w:96, h:24 },
+      { x:936, y:288, w:96, h:24 },
       { x:840, y:192, w:24, h:24 },
       { x:672, y:168, w:96, h:24 },
-      { x:408, y:96, w:240, h:24 }
+      { x:408, y:120, w:240, h:24 },
+      { x:0, y:-24, w:504, h:48 },
+      { x:600, y:-24, w:1104, h:48 },
+      { x:552, y:408, w:48, h:24 },
+      { x:960, y:240, w:24, h:48 }
       ],
       spawns: [
-      { name:"fromCorridor", x:140, y:638 }
+      { name:"fromCorridor", x:140, y:638 },
+      { name:"formHigh", x:528, y:90 }
       ],
       transitions: [
-      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena", door:"arenaGate" }
+      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena", door:"arenaGate" },
+      { rect: { x:500, y:-70, w:100, h:96 }, to:"room1", spawn:"fromArena", door:"ArenaHigh" }
       ],
       enemies: [
       { kind:"walker", x:1320, y:648 },
@@ -143,20 +149,70 @@ export interface RoomDef {
       { kind:"crawler", x:852, y:168 }
       ],
   };
-  // room1 · id="room1"（由碰撞箱地图编辑器生成）
+  // High · id="room1"（由碰撞箱地图编辑器生成）
   const room1: RoomDef = {
       id: "room1",
-      name: "room1",
-      w: 1600,
-      h: 760,
+      name: "High",
+      w: 3200,
+      h: 1500,
       solids: [
+      { x:24, y:1440, w:1992, h:72 },
+      { x:2136, y:1440, w:1056, h:72 },
+      { x:1344, y:0, w:168, h:552 },
+      { x:1512, y:360, w:312, h:192 },
+      { x:1200, y:696, w:408, h:288 },
+      { x:1368, y:984, w:240, h:456 },
+      { x:1608, y:1320, w:144, h:24 },
+      { x:1800, y:1200, w:192, h:24 },
+      { x:2160, y:984, w:264, h:24 },
+      { x:2424, y:912, w:144, h:96 },
+      { x:2520, y:1008, w:192, h:168 },
+      { x:2640, y:816, w:192, h:96 },
+      { x:2640, y:912, w:72, h:96 },
+      { x:2232, y:1008, w:72, h:24 },
+      { x:2352, y:1008, w:24, h:24 },
+      { x:2280, y:1032, w:24, h:216 },
+      { x:2376, y:624, w:216, h:24 },
+      { x:2472, y:648, w:48, h:48 },
+      { x:2112, y:528, w:192, h:48 },
+      { x:1728, y:792, w:192, h:24 },
+      { x:3192, y:0, w:72, h:1512 },
+      { x:-48, y:0, w:72, h:1512 },
+      { x:-48, y:-48, w:3312, h:48 },
+      { x:2688, y:696, w:120, h:24 },
+      { x:2040, y:1080, w:72, h:24 },
+      { x:768, y:1320, w:96, h:24 },
+      { x:600, y:1224, w:72, h:24 },
+      { x:504, y:1104, w:48, h:24 },
+      { x:408, y:960, w:72, h:24 },
+      { x:576, y:864, w:120, h:24 },
+      { x:768, y:792, w:120, h:24 },
+      { x:960, y:720, w:120, h:24 },
+      { x:504, y:1080, w:24, h:24 },
+      { x:936, y:840, w:24, h:24 },
+      { x:960, y:1032, w:24, h:24 },
+      { x:816, y:984, w:24, h:24 },
+      { x:1104, y:864, w:24, h:24 }
       ],
       spawns: [
+      { name:"fromArena", x:2050, y:1300 }
       ],
       transitions: [
-      { rect: { x:384, y:700, w:48, h:96 }, to:"hub", spawn:"enter" }
+      { rect: { x:2000, y:1470, w:150, h:96 }, to:"arena", spawn:"formHigh", door:"ArenaHigh" }
       ],
       enemies: [
+      { kind:"crawler", x:1680, y:1416 },
+      { kind:"walker", x:1752, y:1416 },
+      { kind:"crawler", x:2424, y:1416 },
+      { kind:"walker", x:3024, y:1416 },
+      { kind:"walker", x:2736, y:1416 },
+      { kind:"crawler", x:2688, y:792 },
+      { kind:"crawler", x:2496, y:888 },
+      { kind:"crawler", x:2304, y:960 },
+      { kind:"crawler", x:2496, y:600 },
+      { kind:"crawler", x:1848, y:768 },
+      { kind:"crawler", x:1416, y:672 },
+      { kind:"crawler", x:1704, y:1296 }
       ],
   };
   const ROOMS_EDITOR: RoomDef[] = [hub, corridor, arena, room1];
