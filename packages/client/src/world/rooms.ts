@@ -49,16 +49,15 @@ export interface RoomDef {
       { x:648, y:360, w:144, h:24 },
       { x:1220, y:390, w:220, h:22 },
       { x:130, y:560, w:60, h:80 },
-      { x:1548.649666323243, y:505.34881456417173, w:1, h:1 },
       { x:840, y:264, w:264, h:24 },
       { x:1152, y:168, w:408, h:24 }
       ],
       spawns: [
-      { name:"fromCorridor", x:1500, y:618 },
-      { name:"enter", x:84, y:592 }
+      { name:"enter", x:90, y:618 },
+      { name:"fromCorridor", x:1500, y:618 }
       ],
       transitions: [
-      { rect: { x:1540, y:480, w:60, h:160 }, to:"corridor", spawn:"fromHub", door:"HubCorrider" }
+      { rect: { x:1540, y:480, w:60, h:160 }, to:"corridor", spawn:"fromHub" }
       ],
       enemies: [
       { kind:"crawler", x:520, y:628 },
@@ -73,28 +72,36 @@ export interface RoomDef {
       w: 1500,
       h: 620,
       solids: [
-      { x:0, y:552, w:528, h:72 },
-      { x:672, y:552, w:528, h:72 },
-      { x:1272, y:552, w:240, h:72 },
-      { x:0, y:0, w:48, h:552 },
+      { x:0, y:552, w:408, h:72 },
+      { x:696, y:552, w:480, h:72 },
+      { x:1248, y:552, w:264, h:72 },
+      { x:0, y:0, w:40, h:560 },
       { x:1464, y:0, w:48, h:552 },
-      { x:552, y:456, w:120, h:20 },
-      { x:980, y:480, w:130, h:20 },
-      { x:384, y:384, w:120, h:20 },
-      { x:48, y:0, w:1416, h:192 },
-      { x:624, y:312, w:120, h:24 }
+      { x:432, y:456, w:72, h:24 },
+      { x:240, y:360, w:144, h:24 },
+      { x:168, y:288, w:72, h:96 },
+      { x:312, y:216, w:288, h:24 },
+      { x:1344, y:360, w:24, h:192 },
+      { x:1224, y:312, w:48, h:24 },
+      { x:1128, y:384, w:72, h:24 },
+      { x:1296, y:456, w:48, h:24 },
+      { x:1416, y:432, w:48, h:24 },
+      { x:984, y:288, w:120, h:24 },
+      { x:864, y:216, w:48, h:24 },
+      { x:960, y:120, w:72, h:24 },
+      { x:696, y:96, w:144, h:24 }
       ],
       spawns: [
-      { name:"fromHub", x:120, y:528 },
-      { name:"fromArena", x:1380, y:528 }
+      { name:"fromHub", x:120, y:538 },
+      { name:"fromArena", x:1402, y:538 }
       ],
       transitions: [
-      { rect: { x:0, y:460, w:46, h:120 }, to:"hub", spawn:"fromCorridor", door:"HubCorrider" },
-      { rect: { x:1440, y:440, w:60, h:140 }, to:"arena", spawn:"fromCorridor", door:"CorriderArena" }
+      { rect: { x:0, y:460, w:46, h:120 }, to:"hub", spawn:"fromCorridor" },
+      { rect: { x:1440, y:440, w:60, h:140 }, to:"arena", spawn:"fromCorridor", door:"arenaGate" }
       ],
       enemies: [
-      { kind:"crawler", x:260, y:520 },
-      { kind:"walker", x:888, y:528 }
+      { kind:"crawler", x:260, y:548 },
+      { kind:"walker", x:900, y:548 }
       ],
   };
   // 演武场 · Arena · id="arena"（由碰撞箱地图编辑器生成）
@@ -104,26 +111,55 @@ export interface RoomDef {
       w: 1700,
       h: 760,
       solids: [
-      { x:0, y:660, w:1700, h:100 },
-      { x:0, y:0, w:40, h:660 },
-      { x:1660, y:0, w:40, h:660 },
-      { x:480, y:520, w:240, h:22 },
-      { x:900, y:460, w:220, h:22 },
-      { x:1300, y:540, w:220, h:22 }
+      { x:0, y:672, w:1704, h:96 },
+      { x:0, y:0, w:24, h:672 },
+      { x:1656, y:0, w:48, h:672 },
+      { x:816, y:552, w:96, h:24 },
+      { x:912, y:480, w:240, h:24 },
+      { x:1392, y:552, w:120, h:24 },
+      { x:600, y:456, w:120, h:24 },
+      { x:408, y:360, w:96, h:24 },
+      { x:816, y:336, w:96, h:24 },
+      { x:912, y:504, w:48, h:168 },
+      { x:1128, y:432, w:24, h:48 },
+      { x:1272, y:456, w:72, h:24 },
+      { x:936, y:216, w:96, h:24 },
+      { x:840, y:192, w:24, h:24 },
+      { x:672, y:168, w:96, h:24 },
+      { x:408, y:96, w:240, h:24 }
       ],
       spawns: [
       { name:"fromCorridor", x:140, y:638 }
       ],
       transitions: [
-      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena", door:"CorriderArena" }
+      { rect: { x:0, y:540, w:46, h:140 }, to:"corridor", spawn:"fromArena", door:"arenaGate" }
       ],
       enemies: [
       { kind:"walker", x:1320, y:648 },
       { kind:"crawler", x:720, y:648 },
-      { kind:"crawler", x:1040, y:648 }
+      { kind:"crawler", x:1040, y:648 },
+      { kind:"crawler", x:984, y:432 },
+      { kind:"walker", x:1056, y:456 },
+      { kind:"crawler", x:852, y:168 }
       ],
   };
-  const ROOMS_EDITOR: RoomDef[] = [hub, corridor, arena];
+  // room1 · id="room1"（由碰撞箱地图编辑器生成）
+  const room1: RoomDef = {
+      id: "room1",
+      name: "room1",
+      w: 1600,
+      h: 760,
+      solids: [
+      ],
+      spawns: [
+      ],
+      transitions: [
+      { rect: { x:384, y:700, w:48, h:96 }, to:"hub", spawn:"enter" }
+      ],
+      enemies: [
+      ],
+  };
+  const ROOMS_EDITOR: RoomDef[] = [hub, corridor, arena, room1];
 // ==== EDITOR_DATA_END ====
 // ════ 围栏结束 ════
 // 围栏内是编辑器维护的数据（房间常量 + ROOMS_EDITOR 汇总，随保存自动更新）；

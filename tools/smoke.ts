@@ -296,20 +296,23 @@ console.log('== 16. 限制重生点位置：出生点嵌地形时被推出到合
 
 console.log('== 17. 通道门(清房解锁/双向同名) + 下劈反弹高度 ==');
 {
-  // 怪未清空 → 门不开
-  const none = doorsUnlockedByRoom(ROOMS.corridor, 'corridor', new Set());
-  check('怪未清空 → 通道门不开', none.length === 0, `doors=${none.join(',')}`);
-  // 清空本房间 → 解锁本房间带 door 的全部通道（门名由地图数据决定，数据驱动断言）
-  const all = new Set(ROOMS.corridor.enemies.map((_, i) => `corridor:${i}`));
-  const opened = doorsUnlockedByRoom(ROOMS.corridor, 'corridor', all);
-  const corridorDoors = [...new Set(ROOMS.corridor.transitions.map((t) => t.door).filter((d): d is string => !!d))];
-  check('怪清空 → 解锁本房间全部门', corridorDoors.length > 0 && corridorDoors.every((d) => opened.includes(d)), `doors=${opened.join(',')}`);
-  // 双侧：每个门名应在至少两个房间的过渡里同时出现
-  const allRooms = Object.values(ROOMS);
-  for (const d of corridorDoors) {
-    const n = allRooms.filter((r) => r.transitions.some((t) => t.door === d)).length;
-    check(`门「${d}」双侧同名同开/同关`, n >= 2, `count=${n}`);
-  }
+  // 用内存构造的红带门房间做数据驱动断言（不依赖当前地图是否配门）
+  const doorRoom: RoomDef = {
+    id: 'dr', name: '门房', w: 1000, h: 600, solids: [], spawns: [],
+    transitions: [
+      { rect: { x: 0, y: 0, w: 48, h: 96 }, to: 'other', spawn: 'in', door: 'gate' },
+      { rect: { x: 500, y: 0, w: 48, h: 96 }, to: 'hub', spawn: 'enter' },
+    ],
+    enemies: [
+      { kind: 'crawler', x: 30, y: 30 },
+      { kind: 'walker', x: 60, y: 30 },
+      { kind: 'crawler', x: 90, y: 30 },
+    ],
+  };
+  check('怪未清空 → 通道门不开', doorsUnlockedByRoom(doorRoom, 'dr', new Set()).length === 0, 'none');
+  const all = new Set(doorRoom.enemies.map((_, i) => `dr:${i}`));
+  const opened = doorsUnlockedByRoom(doorRoom, 'dr', all);
+  check('怪清空 → 解锁带 door 的门(无门通道不受影响)', opened.join(',') === 'gate', `doors=${opened.join(',')}`);
   // 下劈反弹高度 ≥ 点按跳跃
   check('下劈反跳≥点按跳跃高度', FEEL.pogoBounce >= FEEL.jumpVel, `pogo=${FEEL.pogoBounce} jump=${FEEL.jumpVel}`);
   // 编辑器序列化/解析往返保留 door（保存到工程不丢门数据）
@@ -334,6 +337,21 @@ console.log('== 18. 角色参数覆盖：applyFeelOverrides 合并生效 ==');
   // 还原默认，避免污染后续用例
   applyFeelOverrides({ playerW: oldW, playerH: 42, attackBox: { h: oldAH, w: 64 } });
   check('还原后恢复默认', FEEL.playerW === 26 && FEEL.attackBox.w === 64, `w=${FEEL.playerW} aw=${FEEL.attackBox.w}`);
+}
+
+console.log('== 19. 敌人击退不卡墙：贴墙被击退后能转身离开 ==');
+{
+  // crawler 贴右墙(1656)被朝墙方向击退 → 击退结束后应换向走开，而非钉死墙角
+  const solids = ROOMS.arena.solids;
+  const e = new Enemy('crawler', 1644, 651);
+  e.takeHit({ damage: 1, knockX: 170, knockY: -130 }, 1);
+  let maxRight = e.x + e.w / 2;
+  for (let i = 0; i < 40; i++) {
+    e.update(1 / 60, solids, null);
+    maxRight = Math.max(maxRight, e.x + e.w / 2);
+  }
+  check('击退后离开墙角', e.x < 1630, `final x=${e.x.toFixed(1)}`);
+  check('击退全程未穿墙', maxRight <= 1656.5, `maxRight=${maxRight.toFixed(1)}`);
 }
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);

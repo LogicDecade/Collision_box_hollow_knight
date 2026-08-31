@@ -96,7 +96,9 @@ export class Enemy implements Fighter {
     }
 
     if (this.knockT > 0) {
-      this.knockT -= dt;
+      // 击退计时 clamp 到 0（不能减成负数，否则帧尾 !knockT 的换向判断永假，
+      // 敌人被击退贴墙后会永远朝墙推、卡死在墙角）
+      this.knockT = Math.max(0, this.knockT - dt);
     } else {
       // 决定朝向与速度
       const dx = player ? player.x - this.x : 0;

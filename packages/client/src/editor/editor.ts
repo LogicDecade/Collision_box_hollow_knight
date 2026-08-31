@@ -114,6 +114,17 @@ class EditorScene extends Phaser.Scene {
     // 编辑器也应用已保存的角色覆盖，让面板显示「当前生效手感」
     applyFeelOverrides(loadFeelOverrides() ?? {});
     this.set = loadSet();
+    // 把活房间(ROOMS)的 door 同步进工作集：防止旧工作集(无门数据)「保存到工程」时
+    // 把已配好的通道门清掉；仅当 live 侧有门才补（用户想删门时保存会写回 undefined，下轮不补）
+    for (const [id, live] of Object.entries(ROOMS)) {
+      const ws = this.set.rooms[id];
+      if (!ws) continue;
+      const n = Math.min(ws.transitions.length, live.transitions.length);
+      for (let i = 0; i < n; i++) {
+        const d = live.transitions[i].door;
+        if (d !== undefined) ws.transitions[i].door = d;
+      }
+    }
     this.room = this.set.rooms[this.set.current] ?? Object.values(this.set.rooms)[0];
 
     this.cameras.main.setBackgroundColor(COL.bg);
@@ -285,13 +296,15 @@ class EditorScene extends Phaser.Scene {
     this.input.on(
       'wheel',
       (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-        // 以鼠标指针为焦点缩放：缩放前后保持指针下的世界点不动
+        // 缩放以鼠标指针为焦点：上滚放大、下滚缩小；缩放前后指针下的世界点不动。
+        // 相机为 scroll 模式(原点=左上)，世界点 = scroll + 屏幕/zoom
         const cam = this.cameras.main;
-        const z2 = Phaser.Math.Clamp(cam.zoom * (dy > 0 ? 1.1 : 0.9), 0.25, 3);
-        const m = cam.getWorldPoint(p.x, p.y);
+        const wpx = cam.scrollX + p.x / cam.zoom;
+        const wpy = cam.scrollY + p.y / cam.zoom;
+        const z2 = Phaser.Math.Clamp(cam.zoom * (dy < 0 ? 1.1 : 1 / 1.1), 0.25, 3);
         cam.setZoom(z2);
-        cam.scrollX = m.x - p.x / z2;
-        cam.scrollY = m.y - p.y / z2;
+        cam.scrollX = wpx - p.x / z2;
+        cam.scrollY = wpy - p.y / z2;
       },
     );
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
@@ -470,6 +483,19 @@ class EditorScene extends Phaser.Scene {
           <label>名称 <input data-act="room:name" type="text"></label>
           <label>宽 <input data-act="room:w" type="number" step="48"> 高 <input data-act="room:h" type="number" step="48"></label>
         </section>
+        <section><h3>地图保存 / 导出</h3>
+          <div class="cb-row buttons">
+            <button data-act="save:project" class="cb-primary">保存到工程 ⤓</button>
+            <button data-act="exp:ts">复制 TS</button>
+            <button data-act="exp:json">下载 JSON</button>
+            <button data-act="imp:open">导入</button>
+          </div>
+          <label class="cb-row"><span>map token</span><input data-act="save:token" type="text" placeholder="后端启动日志里的 token" autocomplete="off"></label>
+          <textarea data-act="imp:ta" rows="6" hidden></textarea>
+          <button data-act="imp:apply" hidden>应用</button>
+          <p class="cb-hint"><b>命名规则：</b>通道「目标=目标房间 id」「出生点=目标房间里的出生点名」；<b>门名</b>留空=始终开放，填同名=两侧同开/同关（本房间小怪清空后开）。出生点先在对应房间画好并命名（如 enter / fromCorridor），再让通道指过来。</p>
+          <p class="cb-hint">「保存到工程」由本地后端改写 world/rooms.ts，保存后 Vite 自动刷新即可试玩。</p>
+        </section>
         <section><h3>角色参数 · 试玩生效</h3>
           <div data-act="feel:panel"></div>
           <div class="cb-row buttons" style="margin-top:8px">
@@ -487,19 +513,7 @@ class EditorScene extends Phaser.Scene {
           <label class="cb-row"><input data-act="opt:grid" type="checkbox" checked> 显示网格</label>
         </section>
         <section><h3>选中对象</h3><div data-act="obj:panel">（未选中）</div></section>
-        <section><h3>导出 / 导入</h3>
-          <div class="cb-row buttons">
-            <button data-act="save:project" class="cb-primary">保存到工程 ⤓</button>
-            <button data-act="exp:ts">复制 TS</button>
-            <button data-act="exp:json">下载 JSON</button>
-            <button data-act="imp:open">导入</button>
-          </div>
-          <label class="cb-row"><span>map token</span><input data-act="save:token" type="text" placeholder="后端启动日志里的 token" autocomplete="off"></label>
-          <textarea data-act="imp:ta" rows="6" hidden></textarea>
-          <button data-act="imp:apply" hidden>应用</button>
-          <p class="cb-hint">「保存到工程」由本地后端直接改写 world/rooms.ts，保存后 Vite 自动刷新即可试玩。</p>
-          <p class="cb-hint">拖拽：左键选择/移动，右键平移，滚轮缩放，Del 删除，Ctrl+Z/Y 撤销。</p>
-        </section>
+        <p class="cb-hint">拖拽：左键选择/移动，右键平移，滚轮缩放(以鼠标为中心)，Del 删除，Ctrl+Z/Y 撤销。</p>
       </div>`;
 
     host.addEventListener('change', (e) => this.onPanelChange(e));
