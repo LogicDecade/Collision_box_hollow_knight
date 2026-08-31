@@ -25,11 +25,19 @@ export interface SaveStatus {
 }
 
 export async function saveRoomsToProject(rooms: readonly RoomDef[], token: string): Promise<SaveStatus> {
+  return postSave('/api/editor/save-room', workingSetToEntryTS(rooms), token);
+}
+
+/** 角色参数 → 后端写回 feel.ts 围栏段 */
+export async function saveFeelToProject(block: string, token: string): Promise<SaveStatus> {
+  return postSave('/api/editor/save-feel', block, token);
+}
+
+async function postSave(path: string, block: string, token: string): Promise<SaveStatus> {
   if (!token.trim()) return { ok: false, msg: '先填 map token（启动后端日志里有）' };
   setToken(token);
-  const block = workingSetToEntryTS(rooms);
   try {
-    const res = await fetch('/api/editor/save-room', {
+    const res = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: token.trim(), block }),

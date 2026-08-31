@@ -1,6 +1,9 @@
-// 手感调参：移动 / 跳跃 / 贴墙 / 攻击 / 灵魂 —— 全在此处收敛
-// 运行时可被 localStorage 中的「角色编辑器」覆盖（applyFeelOverrides）。
-export const FEEL = {
+// 手感调参：移动 / 跳跃 / 贴墙 / 攻击 / 灵魂 —— 全在此处收敛。
+// 运行时可被 localStorage 中的「角色编辑器试玩覆盖」再叠加（applyFeelOverrides）。
+// 编辑器「保存到工程」直接改写下方 EDITOR_ROLE 围栏段，随仓库发布 → 本地/线上手感一致。
+// ==== EDITOR_ROLE_START ====
+/** 角色基础参数（默认手感）。编辑器「保存到工程」会改写本段。 */
+const FEEL_BASE = {
   // 实体尺寸
   playerW: 26,
   playerH: 42,
@@ -53,8 +56,52 @@ export const FEEL = {
 
   maxHp: 6,
 };
+// ==== EDITOR_ROLE_END ====
 
-// ------- 角色参数覆盖（角色编辑器 → localStorage → 游戏运行时生效） -------
+/** 运行时手感（= 工程默认 FEEL_BASE + 本地试玩覆盖）。 */
+export const FEEL: typeof FEEL_BASE = { ...FEEL_BASE };
+
+/** 角色编辑器可调参数分组（点路径 key；追加「技能」等新组直接在这里加） */
+export const FEEL_GROUPS: { name: string; rows: Array<[string, string]> }[] = [
+  { name: '角色体积', rows: [['playerW', '宽'], ['playerH', '高']] },
+  { name: '移动', rows: [['runSpeed', '跑速'], ['accel', '加速'], ['friction', '摩擦'], ['airControl', '空中操控']] },
+  { name: '跳跃', rows: [['gravity', '重力'], ['jumpVel', '起跳速度'], ['jumpCutMult', '松键切短倍率'], ['fallGravityMult', '下落倍率'], ['maxFall', '最大下落'], ['coyote', '土狼时间'], ['jumpBuffer', '预输入']] },
+  { name: '贴墙', rows: [['wallSlideMax', '下滑限速'], ['wallJumpX', '墙跳·横向'], ['wallJumpY', '墙跳·纵向']] },
+  { name: '攻击', rows: [['attackCd', '冷却'], ['attackDur', '总时长'], ['attackHitWindow', '命中窗口'], ['attackBox.w', '平砍·宽'], ['attackBox.h', '平砍·高'], ['attackOffsetX', '平砍·前伸'], ['upSlashBox.w', '上劈·宽'], ['upSlashBox.h', '上劈·高'], ['upSlashOffsetY', '上劈·偏移'], ['upSlashHop', '上劈·上跃'], ['downSlashBox.w', '下劈·宽'], ['downSlashBox.h', '下劈·高'], ['downSlashOffsetY', '下劈·偏移']] },
+  { name: '下劈反跳', rows: [['pogoBounce', '反跳']] },
+  { name: '灵魂', rows: [['soulMax', '上限'], ['soulPerHit', '每击获得'], ['healCost', '回血消耗'], ['healChannel', '吟唱时长']] },
+  { name: '受击 / 生命', rows: [['hurtInvuln', '无敌时长'], ['knockX', '击退·X'], ['knockY', '击退·Y'], ['maxHp', '生命上限']] },
+];
+
+/** 读 FEEL 某个点路径值（'attackBox.w' → FEEL.attackBox.w） */
+export function feelGet(path: string): number {
+  const parts = path.split('.');
+  let v: unknown = FEEL;
+  for (const p of parts) v = (v as Record<string, unknown>)?.[p];
+  return typeof v === 'number' ? v : 0;
+}
+
+/** 把「点路径 → 数值」的参数表渲染成 feel.ts 围栏块源码（编辑器「保存到工程」用） */
+export function feelParamsToBlock(paths: Record<string, number>): string {
+  const flat: Array<[string, number]> = [];
+  const boxes: Record<string, { w: number; h: number }> = {};
+  for (const [k, v] of Object.entries(paths)) {
+    if (!Number.isFinite(v)) continue;
+    const parts = k.split('.');
+    if (parts.length === 1) flat.push([k, v]);
+    else (boxes[parts[0]] ??= { w: 0, h: 0 })[parts[1] as 'w' | 'h'] = v;
+  }
+  const lines: string[] = [
+    '/** 角色基础参数（默认手感）。编辑器「保存到工程」会改写本段。 */',
+    'const FEEL_BASE = {',
+  ];
+  for (const [k, v] of flat) lines.push(`  ${k}: ${v},`);
+  for (const [k, b] of Object.entries(boxes)) lines.push(`  ${k}: { w: ${b.w}, h: ${b.h} },`);
+  lines.push('};');
+  return lines.join('\n');
+}
+
+// ------- 角色参数试玩覆盖（角色编辑器「应用到试玩」→ localStorage → 游戏运行时生效） -------
 const OVERRIDE_KEY = 'cb_feel_over';
 
 export function loadFeelOverrides(): Record<string, unknown> | null {

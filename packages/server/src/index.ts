@@ -6,7 +6,7 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createUser, findUserByUsername } from './db.js';
 import { hashPassword, verifyPassword, signToken, verifyToken } from './auth.js';
-import { writeRoomsBlock, FENCE_START, FENCE_END } from './roomEditor.js';
+import { writeRoomsBlock, writeFeelBlock, FENCE_START, FENCE_END } from './roomEditor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_PROD = process.env.SERVER === 'prod';
@@ -20,7 +20,7 @@ if (IS_PROD && !process.env.JWT_SECRET) {
 // ------- 编辑器写文件用的一次性 token（仅本地开发；生产不暴露该能力） -------
 function ensureEditorToken(): string {
   // 持久化到工程根的 .dev-token（map 前导 + 24 字节随机 hex = 49 字符）
-  const p = resolve(__dirname, '../../.dev-token');
+  const p = resolve(__dirname, '../../../.dev-token'); // src→server→packages→仓库根
   try {
     const existing = readFileSync(p, 'utf8').trim();
     if (/^map_[0-9a-f]{48}$/.test(existing)) return existing;
@@ -141,6 +141,19 @@ if (!IS_PROD) {
     start: FENCE_START,
     end: FENCE_END,
   }));
+
+  app.post('/api/editor/save-feel', async (req, reply) => {
+    const body = (req.body ?? {}) as { token?: unknown; block?: unknown };
+    if (body.token !== EDITOR_TOKEN) {
+      return reply.code(401).send({ error: '无效的保存 token（请填启动日志里的 map token）' });
+    }
+    const block = typeof body.block === 'string' ? body.block : '';
+    if (!block.trim()) return reply.code(400).send({ error: '缺少角色参数数据' });
+    const res = await writeFeelBlock(block);
+    if (!res.ok) return reply.code(400).send({ error: res.error });
+    app.log.info({ blockLines: res.blockLines }, 'editor saved feel.ts');
+    return reply.send({ ok: true, hint: '已写回 feel.ts（刷新/重启后生效，随仓库发布到线上同手感）' });
+  });
 }
 
 const port = Number(process.env.PORT || 3001);

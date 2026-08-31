@@ -13,8 +13,8 @@ import {
   snap,
   snapRect,
 } from './roomData';
-import { getToken, setToken, saveRoomsToProject } from './save';
-import { FEEL, loadFeelOverrides, saveFeelOverrides, clearFeelOverrides, applyFeelOverrides } from '../engine/feel';
+import { getToken, setToken, saveRoomsToProject, saveFeelToProject } from './save';
+import { FEEL_GROUPS, feelGet, feelParamsToBlock, loadFeelOverrides, saveFeelOverrides, clearFeelOverrides, applyFeelOverrides } from '../engine/feel';
 // 需逃逸的文本值（房间名等）
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -34,29 +34,6 @@ const COL = {
 };
 
 type Tool = 'select' | 'solid' | 'spawn' | 'transition' | 'enemy';
-
-/**
- * 角色参数编辑分组（点路径 key：'attackBox.w' 代表嵌套对象字段）。
- * 后续追加「技能」等新分组直接往这里加 { name, rows } 即可。
- */
-const FEEL_GROUPS: { name: string; rows: Array<[string, string]> }[] = [
-  { name: '角色体积', rows: [['playerW', '宽'], ['playerH', '高']] },
-  { name: '移动', rows: [['runSpeed', '跑速'], ['accel', '加速'], ['friction', '摩擦'], ['airControl', '空中操控']] },
-  { name: '跳跃', rows: [['gravity', '重力'], ['jumpVel', '起跳速度'], ['jumpCutMult', '松键切短'], ['fallGravityMult', '下落倍率'], ['maxFall', '最大下落'], ['coyote', '土狼时间'], ['jumpBuffer', '预输入']] },
-  { name: '贴墙', rows: [['wallSlideMax', '下滑限速'], ['wallJumpX', '墙跳·横向'], ['wallJumpY', '墙跳·纵向']] },
-  { name: '攻击', rows: [['attackCd', '冷却'], ['attackHitWindow', '命中窗口'], ['attackBox.w', '平砍·宽'], ['attackBox.h', '平砍·高'], ['attackOffsetX', '平砍·前伸'], ['upSlashBox.w', '上劈·宽'], ['upSlashBox.h', '上劈·高'], ['upSlashOffsetY', '上劈·偏移'], ['upSlashHop', '上劈·上跃'], ['downSlashBox.w', '下劈·宽'], ['downSlashBox.h', '下劈·高'], ['downSlashOffsetY', '下劈·偏移']] },
-  { name: '下劈反跳', rows: [['pogoBounce', '反跳速度']] },
-  { name: '灵魂', rows: [['soulMax', '上限'], ['soulPerHit', '每击获得'], ['healCost', '回血消耗'], ['healChannel', '吟唱时长']] },
-  { name: '受击 / 生命', rows: [['hurtInvuln', '无敌时长'], ['knockX', '击退·X'], ['knockY', '击退·Y'], ['maxHp', '生命上限']] },
-];
-
-/** 读取 FEEL 里的值（支持点路径 'attackBox.w'） */
-function feelGet(path: string): number {
-  const parts = path.split('.');
-  let v: unknown = FEEL;
-  for (const p of parts) v = (v as Record<string, unknown>)[p];
-  return typeof v === 'number' ? v : 0;
-}
 
 interface WorkingSet {
   rooms: Record<string, RoomDef>;
@@ -505,6 +482,7 @@ class EditorScene extends Phaser.Scene {
         <section><h3>角色参数 · 试玩生效</h3>
           <div data-act="feel:panel"></div>
           <div class="cb-row buttons" style="margin-top:8px">
+            <button data-act="feel:save" class="cb-primary">保存到工程 ⤓</button>
             <button data-act="feel:apply">应用到试玩</button>
             <button data-act="feel:reset">恢复默认</button>
           </div>
@@ -550,7 +528,7 @@ class EditorScene extends Phaser.Scene {
     }
   }
 
-  private onPanelClick(e: Event): void {
+  private async onPanelClick(e: Event): Promise<void> {
     const el = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
     if (!el) return;
     const act = el.getAttribute('data-act')!;
@@ -632,6 +610,18 @@ class EditorScene extends Phaser.Scene {
       }
       saveFeelOverrides(out);
       this.flash('✔ 角色参数已应用到本地试玩（打开游戏页生效）');
+    } else if (act === 'feel:save') {
+      // 角色参数 → feel.ts 围栏段（随仓库发布，部署后线上同手感）
+      const tok = getToken();
+      if (!tok.trim()) {
+        this.flash('先填 map token（地图保存区）');
+        return;
+      }
+      const paths: Record<string, number> = {};
+      for (const g of FEEL_GROUPS) for (const [path] of g.rows) paths[path] = this.feelDraft.get(path) ?? feelGet(path);
+      const st = await saveFeelToProject(feelParamsToBlock(paths), tok);
+      if (st.ok) clearFeelOverrides(); // 已固化进工程：清除本地「试玩」override，手感=工程默认（线上一致）
+      this.flash(st.ok ? '✔ ' + st.msg : '✘ ' + st.msg);
     } else if (act === 'feel:reset') {
       clearFeelOverrides();
       location.reload(); // 重载让 FEEL 恢复默认并重新渲染面板

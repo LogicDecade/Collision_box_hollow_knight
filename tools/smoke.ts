@@ -4,12 +4,11 @@
 import { Player } from '../packages/client/src/entities/player';
 import { Enemy } from '../packages/client/src/entities/enemies';
 import { Combat, Fighter } from '../packages/client/src/engine/hitbox';
-import { FEEL } from '../packages/client/src/engine/feel';
-import { applyFeelOverrides } from '../packages/client/src/engine/feel';
+import { FEEL, FEEL_GROUPS, feelGet, applyFeelOverrides, feelParamsToBlock } from '../packages/client/src/engine/feel';
 import { ROOMS, roomLiveEnemies, doorsUnlockedByRoom } from '../packages/client/src/world/rooms';
 import { parseRoom, roomToJSON, roomToTS, snapRect, workingSetToEntryTS } from '../packages/client/src/editor/roomData';
 import { rectsOverlap, depenetrate } from '../packages/client/src/engine/rect';
-import { writeRoomsBlock, FENCE_START, FENCE_END } from '../packages/server/src/roomEditor';
+import { writeRoomsBlock, writeFeelBlock, FENCE_START, FENCE_END, FENCE_FEEL_START, FENCE_FEEL_END } from '../packages/server/src/roomEditor';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -359,6 +358,26 @@ console.log('== 19. 敌人击退不卡墙：贴墙被击退后能转身离开 ==
   check('击退全程未穿墙', maxRight <= 1656.5, `maxRight=${maxRight.toFixed(1)}`);
 }
 
+console.log('== 20. 角色参数工程化：面板字段全覆盖 + 围栏块生成 ==');
+{
+  // 面板能编辑的字段应覆盖 FEEL 全部（含嵌套 attackBox.w 等），否则保存到工程会丢字段
+  const paths: Record<string, number> = {};
+  for (const g of FEEL_GROUPS) for (const [path] of g.rows) paths[path] = feelGet(path);
+  const flatAll = (o: Record<string, unknown>, pre = ''): string[] => {
+    const out: string[] = [];
+    for (const [k, v] of Object.entries(o)) {
+      const p = pre ? `${pre}.${k}` : k;
+      if (v && typeof v === 'object') out.push(...flatAll(v as Record<string, unknown>, p));
+      else out.push(p);
+    }
+    return out;
+  };
+  const missing = flatAll(FEEL as unknown as Record<string, unknown>).filter((k) => !(k in paths));
+  check('编辑器面板覆盖 FEEL 全部参数', missing.length === 0, `缺: ${missing.join(',')}`);
+  const block = feelParamsToBlock(paths);
+  check('生成块含下劈反跳', /pogoBounce:\s*720/.test(block), block.split('\n').find((l) => l.includes('pogoBounce')) ?? '');
+}
+
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
 
 // ===== 14. 编辑器「保存到工程」：围栏整体替换 + 语法拒绝 + 外部保护 =====
@@ -410,6 +429,25 @@ console.log('== 14. 编辑器保存到工程：围栏替换只动数据段、坏
     writeFileSync(plain, 'export const a = 1;', 'utf8');
     const r3 = await writeRoomsBlock(goodBlock, plain);
     check('无围栏文件被拒绝', !r3.ok, r3.error);
+
+    // 4) 角色参数 → feel 围栏写读（headless 临时文件）
+    const feelF = join(dir, 'feel.ts');
+    writeFileSync(
+      feelF,
+      'const FEEL_BASE = { playerW: 26 };\n' +
+        FENCE_FEEL_START + '\n' +
+        'const FEEL_BASE_PLACEHOLDER = { playerW: 1 };\n' +
+        FENCE_FEEL_END + '\n' +
+        'export const FEEL = { ...FEEL_BASE };\n',
+      'utf8',
+    );
+    const r4 = await writeFeelBlock('const FEEL_BASE = {\n  playerW: 30,\n  pogoBounce: 720,\n};', feelF);
+    check('角色围栏写入成功', r4.ok, r4.error);
+    const after4 = readFileSync(feelF, 'utf8');
+    check(
+      '角色围栏块被替换(外部保留、含围栏标记)',
+      after4.includes('pogoBounce: 720') && after4.includes('export const FEEL') && after4.split(FENCE_FEEL_START).length === 2,
+    );
 
     rmSync(dir, { recursive: true, force: true });
     console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
