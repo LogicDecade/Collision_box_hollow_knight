@@ -496,14 +496,7 @@ class EditorScene extends Phaser.Scene {
           <p class="cb-hint"><b>命名规则：</b>通道「目标=目标房间 id」「出生点=目标房间里的出生点名」；<b>门名</b>留空=始终开放，填同名=两侧同开/同关（本房间小怪清空后开）。出生点先在对应房间画好并命名（如 enter / fromCorridor），再让通道指过来。</p>
           <p class="cb-hint">「保存到工程」由本地后端改写 world/rooms.ts，保存后 Vite 自动刷新即可试玩。</p>
         </section>
-        <section><h3>角色参数 · 试玩生效</h3>
-          <div data-act="feel:panel"></div>
-          <div class="cb-row buttons" style="margin-top:8px">
-            <button data-act="feel:apply">应用到试玩</button>
-            <button data-act="feel:reset">恢复默认</button>
-          </div>
-          <p class="cb-hint">改完点「应用到试玩」存本地，打开游戏页立即按新参数运行（% 会在下次编辑重载）。</p>
-        </section>
+        <section><h3>选中对象</h3><div data-act="obj:panel">（未选中）</div></section>
         <section><h3>工具</h3>
           <div class="cb-tools" data-act="tool:bar"></div>
           <label class="cb-row"><span>敌人类型</span><select data-act="enemy:kind"><option value="crawler">crawler</option><option value="walker">walker</option></select></label>
@@ -512,7 +505,14 @@ class EditorScene extends Phaser.Scene {
           <label class="cb-row"><input data-act="opt:snap" type="checkbox" checked> 网格吸附</label>
           <label class="cb-row"><input data-act="opt:grid" type="checkbox" checked> 显示网格</label>
         </section>
-        <section><h3>选中对象</h3><div data-act="obj:panel">（未选中）</div></section>
+        <section><h3>角色参数 · 试玩生效</h3>
+          <div data-act="feel:panel"></div>
+          <div class="cb-row buttons" style="margin-top:8px">
+            <button data-act="feel:apply">应用到试玩</button>
+            <button data-act="feel:reset">恢复默认</button>
+          </div>
+          <p class="cb-hint">改完点「应用到试玩」存本地，打开游戏页立即按新参数运行（% 会在下次编辑重载）。</p>
+        </section>
         <p class="cb-hint">拖拽：左键选择/移动，右键平移，滚轮缩放(以鼠标为中心)，Del 删除，Ctrl+Z/Y 撤销。</p>
       </div>`;
 

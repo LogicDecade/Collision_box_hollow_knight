@@ -78,7 +78,12 @@ console.log('== 2. 跳跃：起跳后上升再落回地面 ==');
   s.run(10, () => inp({ lx: 0, jumpHeld: true }));
   check('起跳(离地/上升)', s.player.y < yPeak, `y0=${yPeak.toFixed(1)} y1=${s.player.y.toFixed(1)}`);
   s.run(90, () => inp({ lx: 0 }));
-  check('落回地面高度', Math.abs(s.player.y - 618) < 8, `y=${Math.round(s.player.y)}`);
+  // 数据驱动：贴地高度 = 出生点(y0=618)下方最近实心顶 - 半高21（地图可被编辑器改，不硬编码）
+  const floorTop = hub.solids
+    .map((s) => s.y)
+    .filter((t) => t >= 618 && t <= 618 + 200)
+    .reduce((m, t) => Math.min(m, t), Infinity);
+  check('落回地面高度', Number.isFinite(floorTop) && Math.abs(s.player.y - (floorTop - 21)) < 8, `y=${Math.round(s.player.y)} 地面顶=${floorTop}`);
 }
 
 console.log('== 3. 攻击命中敌人：扣血 / 三刀击杀 / 获得灵魂 ==');
