@@ -102,10 +102,6 @@ class EditorScene extends Phaser.Scene {
   private drawStart: { x: number; y: number } | null = null;
   private moveDrag: { ref: ObjRef; grabDX: number; grabDY: number; corner: boolean } | null = null;
 
-  private enemyKind: 'crawler' | 'walker' = 'crawler';
-  private transTo = 'hub';
-  private transSpawn = 'enter';
-
   constructor() {
     super('EditorScene');
   }
@@ -341,11 +337,15 @@ class EditorScene extends Phaser.Scene {
         this.room.spawns.push({ name, x: pt.x, y: pt.y });
         this.selected = { kind: 'spawn', idx: this.room.spawns.length - 1 };
       } else if (this.tool === 'enemy') {
-        this.room.enemies.push({ kind: this.enemyKind, x: pt.x, y: pt.y });
+        // 新建敌人默认 crawler；类型在「选中对象」面板里改
+        this.room.enemies.push({ kind: 'crawler', x: pt.x, y: pt.y });
         this.selected = { kind: 'enemy', idx: this.room.enemies.length - 1 };
       } else {
+        // 新建通道：默认指向第一个其它房间及其第一个出生点（出生点在选中后可改）
         const rect = this.snapOn ? snapRect(pt.x, pt.y, 48, 96) : { x: pt.x, y: pt.y, w: 48, h: 96 };
-        this.room.transitions.push({ rect, to: this.transTo, spawn: this.transSpawn });
+        const firstOther = Object.keys(this.set.rooms).find((id) => id !== this.room.id) ?? this.room.id;
+        const toRoom = this.set.rooms[firstOther];
+        this.room.transitions.push({ rect, to: firstOther, spawn: toRoom?.spawns[0]?.name ?? '' });
         this.selected = { kind: 'transition', idx: this.room.transitions.length - 1 };
       }
       this.commit(() => void 0);
@@ -496,15 +496,12 @@ class EditorScene extends Phaser.Scene {
           <p class="cb-hint"><b>命名规则：</b>通道「目标=目标房间 id」「出生点=目标房间里的出生点名」；<b>门名</b>留空=始终开放，填同名=两侧同开/同关（本房间小怪清空后开）。出生点先在对应房间画好并命名（如 enter / fromCorridor），再让通道指过来。</p>
           <p class="cb-hint">「保存到工程」由本地后端改写 world/rooms.ts，保存后 Vite 自动刷新即可试玩。</p>
         </section>
-        <section><h3>选中对象</h3><div data-act="obj:panel">（未选中）</div></section>
         <section><h3>工具</h3>
           <div class="cb-tools" data-act="tool:bar"></div>
-          <label class="cb-row"><span>敌人类型</span><select data-act="enemy:kind"><option value="crawler">crawler</option><option value="walker">walker</option></select></label>
-          <label class="cb-row"><span>通道→目标</span><select data-act="trans:to"></select></label>
-          <label class="cb-row"><span>通道→出生点</span><input data-act="trans:spawn" type="text"></label>
           <label class="cb-row"><input data-act="opt:snap" type="checkbox" checked> 网格吸附</label>
           <label class="cb-row"><input data-act="opt:grid" type="checkbox" checked> 显示网格</label>
         </section>
+        <section><h3>选中对象</h3><div data-act="obj:panel">（未选中）</div></section>
         <section><h3>角色参数 · 试玩生效</h3>
           <div data-act="feel:panel"></div>
           <div class="cb-row buttons" style="margin-top:8px">
@@ -539,12 +536,6 @@ class EditorScene extends Phaser.Scene {
           else r.h = n;
         });
       }
-    } else if (act === 'enemy:kind') {
-      this.enemyKind = val as 'crawler' | 'walker';
-    } else if (act === 'trans:spawn') {
-      this.transSpawn = val;
-    } else if (act === 'trans:to') {
-      this.transTo = val;
     } else if (act === 'save:token') {
       setToken(val);
     } else if (act.startsWith('cf:')) {
@@ -715,11 +706,8 @@ class EditorScene extends Phaser.Scene {
     const roomH = panel.querySelector<HTMLInputElement>('[data-act="room:h"]')!;
     const toolBar = panel.querySelector<HTMLElement>('[data-act="tool:bar"]')!;
     const objPanel = panel.querySelector<HTMLElement>('[data-act="obj:panel"]')!;
-    const transToSel = panel.querySelector<HTMLSelectElement>('[data-act="trans:to"]')!;
-    const transSpawn = panel.querySelector<HTMLInputElement>('[data-act="trans:spawn"]')!;
     const snapChk = panel.querySelector<HTMLInputElement>('[data-act="opt:snap"]')!;
     const gridChk = panel.querySelector<HTMLInputElement>('[data-act="opt:grid"]')!;
-    const enKindSel = panel.querySelector<HTMLSelectElement>('[data-act="enemy:kind"]')!;
     const feelPanel = panel.querySelector<HTMLElement>('[data-act="feel:panel"]')!;
 
     // 房间下拉
@@ -742,13 +730,6 @@ class EditorScene extends Phaser.Scene {
       .map((t) => `<button data-act="tool" data-tool="${t.id}" class="${this.tool === t.id ? 'on' : ''}">${t.label}</button>`)
       .join('');
 
-    // 过渡预设目标/出生点
-    const transTargetIds = Object.keys(this.set.rooms).filter((k) => k !== this.room.id);
-    transToSel.innerHTML = transTargetIds
-      .map((id) => `<option value="${id}" ${id === this.transTo ? 'selected' : ''}>${id}</option>`)
-      .join('');
-    transSpawn.value = this.transSpawn;
-    enKindSel.value = this.enemyKind;
     this.renderFeelPanel(feelPanel);
     snapChk.checked = this.snapOn;
     gridChk.checked = this.showGrid;
@@ -776,7 +757,21 @@ class EditorScene extends Phaser.Scene {
     } else if (s.kind === 'transition') {
       const tr = this.room.transitions[s.idx];
       if (!tr) { objPanel.textContent = '（已删除）'; return; }
-      objPanel.innerHTML = `<div class="cb-objtitle">通道${tr.door ? ' · 🔒 锁定' : ' · 开放'}</div>${n('x', 'x', tr.rect.x)}${n('y', 'y', tr.rect.y)}${n('宽', 'w', tr.rect.w)}${n('高', 'h', tr.rect.h)}${t('目标房间', 'to', tr.to)}${t('出生点', 'spawnname', tr.spawn)}${t('门名(空=开放)', 'door', tr.door ?? '')}<p class="cb-hint">填上门名即「关门」——本房间小怪清空后开放；两侧通道填<b>相同门名</b>即双侧同开/同锁。</p>`;
+      // 通道属性：先选目标房间 → 再选其中出生点 → 最后命名门（若有）
+      const toOpts = Object.keys(this.set.rooms)
+        .filter((id) => id !== this.room.id)
+        .map((id) => `<option value="${id}" ${id === tr.to ? 'selected' : ''}>${id}</option>`)
+        .join('');
+      const toRoom = this.set.rooms[tr.to];
+      const spawnOpts =
+        (toRoom?.spawns ?? [])
+          .map((sp) => `<option value="${escapeHtml(sp.name)}" ${sp.name === tr.spawn ? 'selected' : ''}>${escapeHtml(sp.name)}（${Math.round(sp.x)},${Math.round(sp.y)}）</option>`)
+          .join('') || '<option value="" selected>（目标房间暂无出生点，请先画出生点）</option>';
+      objPanel.innerHTML = `<div class="cb-objtitle">通道${tr.door ? ' · 🔒 锁定' : ' · 开放'}</div>${n('x', 'x', tr.rect.x)}${n('y', 'y', tr.rect.y)}${n('宽', 'w', tr.rect.w)}${n('高', 'h', tr.rect.h)}
+<label class="cb-row"><span>目标房间</span><select data-act="obj:set-to">${toOpts}</select></label>
+<label class="cb-row"><span>出生点</span><select data-act="obj:set-spawnname">${spawnOpts}</select></label>
+${t('门名(空=开放)', 'door', tr.door ?? '')}
+<p class="cb-hint">流程：先选目标房间 → 选其出生点 → 最后命名门。填门名即「关门」（本房间小怪清空后开放）；两侧填相同门名即双侧同开/同锁。</p>`;
     } else {
       const e = this.room.enemies[s.idx];
       if (!e) { objPanel.textContent = '（已删除）'; return; }
