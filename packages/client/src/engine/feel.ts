@@ -2,60 +2,44 @@
 // 运行时可被 localStorage 中的「角色编辑器试玩覆盖」再叠加（applyFeelOverrides）。
 // 编辑器「保存到工程」直接改写下方 EDITOR_ROLE 围栏段，随仓库发布 → 本地/线上手感一致。
 // ==== EDITOR_ROLE_START ====
-/** 角色基础参数（默认手感）。编辑器「保存到工程」会改写本段。 */
-const FEEL_BASE = {
-  // 实体尺寸
-  playerW: 26,
-  playerH: 42,
-
-  // 移动
-  runSpeed: 235,
-  accel: 2600,
-  friction: 3100,
-  airControl: 0.62,
-
-  // 跳跃（y 向下为正，起跳为负速度）
-  gravity: 1900,
-  jumpVel: 710,
-  /** 上升段重力倍率：按住=1(升满)，松开>1(切短跳跃) */
-  jumpCutMult: 2.2,
-  fallGravityMult: 1.28,
-  maxFall: 660,
-  coyote: 0.1,
-  jumpBuffer: 0.12,
-
-  // 贴墙滑 / 墙跳
-  wallSlideMax: 110,
-  wallJumpX: 430,
-  wallJumpY: 500,
-
-  // 攻击
-  attackCd: 0.34,
-  attackDur: 0.24, // 包含前摇的总时长，命中窗见各攻击
-  attackHitWindow: 0.14,
-  attackBox: { w: 64, h: 52 },
-  attackOffsetX: 36,
-  upSlashBox: { w: 56, h: 66 },
-  upSlashOffsetY: -56,
-  upSlashHop: 180,
-  downSlashBox: { w: 54, h: 62 },
-  downSlashOffsetY: 36,
-  // 下劈踏击反弹：至少达到点按跳跃高度(jumpVel 710)，连踏可越攀越高
-  pogoBounce: 720,
-
-  // 灵魂
-  soulMax: 100,
-  soulPerHit: 11,
-  healCost: 33,
-  healChannel: 0.8,
-
-  // 受击
-  hurtInvuln: 1.15,
-  knockX: 260,
-  knockY: 240,
-
-  maxHp: 6,
-};
+  /** 角色基础参数（默认手感）。编辑器「保存到工程」会改写本段。 */
+  const FEEL_BASE = {
+    playerW: 26,
+    playerH: 42,
+    runSpeed: 235,
+    accel: 2600,
+    friction: 3100,
+    airControl: 0.62,
+    gravity: 1900,
+    jumpVel: 710,
+    jumpCutMult: 2.2,
+    fallGravityMult: 1.28,
+    maxFall: 660,
+    coyote: 0.1,
+    jumpBuffer: 0.12,
+    wallSlideMax: 110,
+    wallJumpX: 430,
+    wallJumpY: 500,
+    attackCd: 0.34,
+    attackDur: 0.24,
+    attackHitWindow: 0.14,
+    attackOffsetX: 36,
+    upSlashOffsetY: -56,
+    upSlashHop: 180,
+    downSlashOffsetY: 36,
+    pogoBounce: 420,
+    soulMax: 100,
+    soulPerHit: 11,
+    healCost: 33,
+    healChannel: 0.8,
+    hurtInvuln: 1,
+    knockX: 260,
+    knockY: 240,
+    maxHp: 6,
+    attackBox: { w: 64, h: 52 },
+    upSlashBox: { w: 56, h: 66 },
+    downSlashBox: { w: 54, h: 62 },
+  };
 // ==== EDITOR_ROLE_END ====
 
 /** 运行时手感（= 工程默认 FEEL_BASE + 本地试玩覆盖）。 */
